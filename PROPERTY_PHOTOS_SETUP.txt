@@ -1,0 +1,41 @@
+MICROTECHNIQUE BUILDTECH — 6 PHOTO PROPERTY GALLERY UPDATE
+
+This update adds the requested photo gallery while keeping the existing property workflow.
+
+WHAT IT ADDS
+- Maximum 6 photos per property.
+- Four sample/demo properties get their own separate six-image illustrative gallery.
+- Owner and Builder can upload up to 6 photos when posting a property.
+- First photo is used as the property-card cover.
+- Clicking View Details opens the property gallery with all photos.
+- Admin can add photos to existing properties from Admin > Properties.
+- Existing property_images table/API is reused; no npm dependency or database replacement.
+
+INSTALL CAREFULLY
+1. Stop the server (Ctrl+C).
+2. Make a backup of these three existing files:
+   public/app.js
+   public/style.css
+   src/server.js
+3. Extract this ZIP into the project ROOT folder:
+   Microtechnique_Buildtech_Complete
+   (The root contains package.json and the data folder.)
+4. Allow the three updated files in public/ and src/ to overwrite their old versions.
+   These are merged updated files, not a new project.
+5. Copy the included public/assets/*.jpg files into your existing public/assets folder.
+   Choose merge/overwrite if Windows asks; do not delete existing assets.
+6. Do NOT replace package.json, the root-level server.js, .env, data/, or data/buildtech.db.
+7. Run: npm start
+8. Open the site and press Ctrl+F5.
+
+Your package.json already starts src/server.js, so that is the active server file.
+
+IMAGE NOTES
+- Photos are compressed in the browser before upload.
+- Each original photo can be up to 12 MB; accepted types are JPG, PNG, WebP.
+- Sample/demo photos are illustrative placeholders, not verified photos of actual properties.
+- Existing uploaded property photos are preserved. Sample images are only added to SAMPLE properties where gallery slots are missing.
+
+CHECKS
+- JavaScript syntax checked with node --check.
+- Actual browser/server runtime and database migration test not performed against your local database. Keep the backup until you confirm upload and gallery behavior.

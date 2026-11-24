@@ -1,0 +1,2725 @@
+const $=s=>document.querySelector(s), app=$('#app');let me=null;const money=n=>'₹'+Number(n||0).toLocaleString('en-IN');const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(url,opts={}){const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||'Request failed');return d}function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3200)}
+async function propertyImageData(file){
+  const source=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Unable to read '+file.name));reader.readAsDataURL(file);
+  });
+  const image=await new Promise((resolve,reject)=>{
+    const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('This photo could not be opened.'));img.src=source;
+  });
+  const scale=Math.min(1,1200/image.width,900/image.height);
+  const canvas=document.createElement('canvas');canvas.width=Math.round(image.width*scale);canvas.height=Math.round(image.height*scale);
+  canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+  let dataUrl=canvas.toDataURL('image/jpeg',.78);
+  if(dataUrl.length>1300000)dataUrl=canvas.toDataURL('image/jpeg',.62);
+  if(dataUrl.length>1400000)throw new Error('Photo is too large after compression. Please choose another photo.');
+  return {filename:file.name.replace(/\.[^.]+$/,'')+'.jpg',data_url:dataUrl};
+}
+async function uploadPropertyImages(propertyId,files){
+  const list=Array.from(files||[]);if(!list.length)return;
+  if(list.length>6)throw new Error('Upload maximum 6 photos per property.');
+  const allowed=['image/jpeg','image/png','image/webp'];
+  for(const file of list){if(!allowed.includes(file.type))throw new Error('Please choose JPG, PNG or WebP photos only.');if(file.size>12*1024*1024)throw new Error('Each original photo must be under 12 MB.');}
+  for(const file of list){const image=await propertyImageData(file);await api('/api/owner/properties/'+Number(propertyId)+'/images',{method:'POST',body:JSON.stringify(image)});}
+}
+
+const links = [
+  ['Buy','/buy'],
+  ['Rent','/rent'],
+  ['New Projects','/new-projects'],
+  ['Commercial','/commercial'],
+  ['Plot & Land','/plots'],
+  ['Home Loans','/home-loans'],
+  ['Services','/services']
+];
+
+function getVisibleLinks() {
+  const restricted = me &&
+    ['buyer', 'tenant'].includes(String(me.role).toLowerCase());
+
+  return restricted
+    ? links.filter(([, url]) =>
+        !['/home-loans', '/services'].includes(url)
+      )
+    : links;
+}function header(){
+  const isHome=location.pathname==='/';
+
+  return `
+    <div class="topline">
+      INDIA-WIDE PROPERTY DISCOVERY • SMART REAL ESTATE SOLUTIONS
+    </div>
+
+    <header class="header">
+      <a class="brand" href="/">
+        <img class="brand-logo" src="/assets/microtechnique-buildtech-logo.png" alt="Microtechnique Buildtech logo">
+        <span>
+          <b>MICROTECHNIQUE<br>BUILDTECH</b>
+          <small>SMART REAL ESTATE SOLUTIONS</small>
+        </span>
+      </a>
+
+      <nav class="nav">
+${getVisibleLinks().map(([n,u])=>`
+      <a href="${u}" class="${location.pathname===u?'active':''}">
+      ${n}
+    </a>
+  `).join('')}
+</nav>
+
+      <div class="actions">
+        ${me?`
+          <a class="btn light" href="/dashboard">
+            ${esc(me.name.split(' ')[0])}
+          </a>
+<button class="secondary" onclick="window.logout()">Logout</button>        `:`
+          <a class="btn light" href="/login">Login</a>
+          <a class="btn" href="/register">Sign Up</a>
+        `}
+      </div>
+    </header>
+  `;
+}
+
+
+function footer(){
+  return `
+  <footer class="footer buildtech-footer">
+    <div class="footer-main">
+
+      <div class="footer-brand-col">
+
+        <div class="brand">
+          <img
+            class="brand-logo"
+            src="/assets/microtechnique-buildtech-logo.png"
+            alt="Microtechnique Buildtech"
+          >
+
+          <span class="footer-brand-text">
+            <b>MICROTECHNIQUE BUILDTECH</b>
+            <small>SMART REAL ESTATE SOLUTIONS</small>
+          </span>
+        </div>
+
+        <p>
+          Discover property opportunities across India's
+          cities, towns and villages with Microtechnique Buildtech.
+        </p>
+
+        <div class="footer-contact-links">
+          <a href="tel:+919226691111">
+            ☎ +91 92266 91111
+          </a>
+
+          <a href="mailto:info@microtechniquebuildtech.com">
+            ✉ info@microtechniquebuildtech.com
+          </a>
+        </div>
+
+      </div>
+
+      <div class="footer-links-col">
+        <h3>Explore</h3>
+
+        <div class="footerlinks">
+          ${getVisibleLinks().map(([n,u]) =>
+            `<a href="${u}">${n}</a>`
+          ).join('')}
+
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
+          <a href="/register">Register</a>
+        </div>
+      </div>
+
+      <div class="footer-location-col">
+        <h3>Visit Our Office</h3>
+
+        <address>
+          Office No. G-40, Star World Complex,<br>
+          Green City Road, Near Bhagwan Circle,<br>
+          Pal Gam, Surat, Gujarat – 394510, India
+        </address>
+
+        <a
+          class="footer-map-link"
+          href="https://www.google.com/maps/search/?api=1&query=Office+No+G-40+Star+World+Complex+Green+City+Road+Near+Bhagwan+Circle+Pal+Gam+Surat+Gujarat+394510"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open location in Google Maps ↗
+        </a>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <small>
+        © ${new Date().getFullYear()}
+        Microtechnique Buildtech. All rights reserved.
+      </small>
+
+      <small>
+        Verify property, title and legal details independently
+        before any transaction.
+      </small>
+    </div>
+  </footer>
+  `;
+}
+
+
+function layout(body){
+  const isHome=location.pathname==='/';
+
+  app.innerHTML=header()+
+    (!isHome?`
+      <div class="global-back-wrap container">
+        <button type="button" class="global-back-btn" id="globalBackButton">
+          ← Back
+        </button>
+      </div>
+    `:'')+
+    body+footer();
+
+  const backButton=$('#globalBackButton');
+
+  if(backButton){
+    backButton.onclick=()=>{
+      if (location.pathname === '/admin/properties') {
+  window.location.href = '/admin/dashboard';
+  return;
+}
+      if(document.referrer &&
+         new URL(document.referrer).origin===location.origin &&
+         window.history.length>1){
+        window.history.back();
+      }else{
+        window.location.href='/';
+      }
+    };
+  }
+
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function pageHero(title,sub,crumb='Home'){return `<section class="pagehero"><div class="crumb"><a href="/">Home</a> / ${crumb}</div><h1>${title}</h1><div>${sub}</div></section>`}
+function home(){layout(`<section class="hero"><div class="hero-slides" aria-hidden="true"><span class="slide slide1"></span><span class="slide slide2"></span><span class="slide slide3"></span><span class="slide slide4"></span></div><div class="eyebrow">A BETTER WAY TO FIND PROPERTY</div><h1>Find Your <span>Dream Property</span></h1><p>Smart Real Estate Solutions for a Better Tomorrow.</p><p>✓ India-wide property discovery &nbsp; ✓ Verified owner listings &nbsp; ✓ Smart property search</p><div class="searchbox"><div class="tabs">${links.slice(0,5).map(([n,u],i)=>`<a class="${i===0?'active':''}" href="${u}">${n}</a>`).join('')}</div><form id="homeSearch" class="searchgrid"><input name="city" placeholder="City (e.g. Surat)"><input name="locality" placeholder="Locality / Village"><select name="category"><option value="">All property types</option><option>Apartment</option><option>Villa</option><option>Residential Plot</option><option>Office Space</option><option>Shop</option></select><input name="min" type="number" placeholder="Budget min"><input name="max" type="number" placeholder="Budget max"><select name="bhk"><option value="">Any BHK</option>${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join('')}</select><button>Search Properties →</button></form></div></section><div class="stats"><div class="stat"><b>India</b><small>Search coverage</small></div><div class="stat"><b>Multiple</b><small>Property categories</small></div><div class="stat"><b>0%</b><small>Brokerage promise only where applicable</small></div></div><section class="container"><div class="sectionhead"><div><div class="eyebrow">EXPLORE PROPERTY</div><h2>Find a place that feels like home</h2><p class="muted">Explore residential and commercial opportunities across India.</p></div><a href="/properties">View all properties →</a></div><div class="grid four">${[['🏢','Apartments & Flats','/buy'],['🏡','Villas & Houses','/buy'],['📐','Residential Plots','/plots'],['🏬','Commercial','/commercial']].map(x=>`<a class="category" href="${x[2]}"><span>${x[0]}</span><strong>${x[1]}</strong><small class="muted">Explore listings →</small></a>`).join('')}</div></section><section class="container" style="background:var(--bg);max-width:none"><div style="max-width:1240px;margin:auto"><div class="sectionhead"><div><div class="eyebrow">CURATED FOR YOU</div><h2>Featured Properties</h2><p class="muted">Explore approved homes and property opportunities. Scroll horizontally to discover more.</p></div><a href="/properties">Browse all →</a></div><div id="featured" class="property-scroller">Loading listings…</div></div></section><section class="container loanband"><div class="eyebrow">HOME FINANCE</div><h2>Planning a home loan?</h2><p>Estimate your EMI and submit an enquiry for follow-up.</p><a class="btn" href="/home-loans">Explore Home Loans</a></section><section class="container"><div class="eyebrow">MORE THAN PROPERTY SEARCH</div><h2>Services for your next move</h2><div class="grid four">${['Home Interiors','Construction & Renovation','Legal Assistance','Packers & Movers'].map(n=>`<a class="category" href="/services"><strong>${n}</strong><small class="muted">Submit service enquiry →</small></a>`).join('')}</div></section><section class="container"><div class="panel"><h2>Are you a property owner or builder?</h2><p class="muted">Create an account to submit a listing for review.</p><a class="btn" href="/register">Register to list property</a></div></section>`);$('#homeSearch').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),p=new URLSearchParams();for(const [k,v]of f)if(v)p.set(k,v);location.href='/buy?'+p.toString()};loadFeatured();}
+
+
+
+
+function propertyCard(p){
+  const saved=Array.isArray(window.savedPropertyIds)
+    ? window.savedPropertyIds.includes(Number(p.id))
+    : false;
+
+  const isRented = p.status === 'rented';
+  const locationText=[
+    p.locality,p.city,p.state
+  ].filter(Boolean).join(', ');
+
+  const imageUrl=p.image_url||p.image||p.photo||'';
+
+  return `
+    <article class="card buy-property-card">
+      <div class="cardimg buy-card-image">
+
+        ${imageUrl
+          ? `<img src="${esc(imageUrl)}" alt="${esc(p.title)}" loading="lazy">`
+          : `<div class="property-image-placeholder">🏠</div>`
+        }
+
+        <a class="property-image-details" href="/property/${Number(p.id)}">
+          View Details →
+        </a>
+
+        <span class="badge buy-card-status">
+          ${isRented ? 'RENTED / ભાડે અપાઈ ગઈ છે' : esc(p.status||'LISTING')}
+        </span>
+
+        ${!isRented ? `
+          <button type="button"
+            class="buy-favourite-btn ${saved?'is-saved':''}"
+            data-favourite-id="${Number(p.id)}"
+            onclick="saveFav(${Number(p.id)})"
+            aria-label="Save property">
+            ${saved?'♥':'♡'}
+          </button>
+        ` : ''}
+
+      </div>
+
+      <div class="cardbody">
+        <h3>${esc(p.title)}</h3>
+
+        <div class="price">${money(p.price)}</div>
+
+        <p class="muted buy-location">
+          📍 ${esc(locationText||'India')}
+        </p>
+
+        <div class="buy-property-facts">
+          <span>${esc(p.area||'—')} sq.ft</span>
+          <span>${esc(p.bhk||'—')} BHK</span>
+          <span>${esc(p.category||'Property')}</span>
+        </div>
+
+        <p class="muted">
+          ${esc(p.description||'Property details available on request')}
+        </p>
+
+        ${p.rera_applicable ? `
+          <span class="buy-rera-label">
+            RERA: ${esc(p.rera_number||'Details available on request')}
+          </span>
+        ` : ''}
+
+        <div class="cardfoot buy-card-actions">
+
+          <a class="btn secondary buy-details-btn"
+             href="/property/${Number(p.id)}">
+            View Details →
+          </a>
+
+          ${isRented ? `
+            <button type="button" class="buy-contact-btn" disabled>
+              RENTED – Request Closed
+            </button>
+          ` : me ? `
+            <button type="button"
+              class="buy-contact-btn"
+              onclick="enquire(${Number(p.id)})">
+              Contact Owner →
+            </button>
+          ` : `
+            <a class="buy-contact-btn" href="/login">
+              Contact Owner →
+            </a>
+          `}
+
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+
+async function loadFeatured(){
+  const holder=$('#featured');
+  try{
+    const offerData=await api('/api/featured-offers');
+    const offers=(offerData.offers||[]).slice(0,12);
+    let rows=offers.map(o=>({id:o.property_id,title:o.title,price:o.offer_price||o.price,original_price:o.price,city:o.city,locality:o.locality,image_url:o.image_url,description:o.discount_label||'Featured property offer',category:'Featured Offer',status:'SPECIAL OFFER'}));
+    if(!rows.length){const d=await api('/api/properties?sort=featured');rows=(d.properties||[]).slice(0,12);}
+    holder.innerHTML=rows.length
+      ? `<div class="property-scroller-track">${rows.map(propertyCard).join('')}${rows.map(propertyCard).join('')}</div>`
+      : '<div class="empty">No approved properties yet. Featured listings will appear here.</div>';
+    holder.classList.add('is-ready');
+  }catch(e){
+    holder.innerHTML='<div class="empty">Featured properties are temporarily unavailable.</div>';
+  }
+}
+const configs={'/buy':['Buy Property','Explore residential properties for sale across India.','buy'],'/rent':['Rent Property','Find homes, apartments and commercial spaces for rent.','rent'],'/commercial':['Commercial Property','Discover offices, shops, warehouses and commercial spaces.','commercial'],'/plots':['Plots & Land','Explore residential, agricultural and commercial land.','plots'],'/new-projects':['New Projects','Discover new residential and commercial developments.','new-project'],'/pg':['PG & Co-living','Find paying guest and shared accommodation.','rent'],'/properties':['All Properties','Search available property listings across India.','']};
+async function searchPage(path){
+  const [title, sub, purpose] = configs[path];
+  
+  const params = new URLSearchParams(location.search);
+
+  layout(`${pageHero(title, sub, title)}
+    <main class="results-layout">
+      <aside class="panel filters">
+        <h3>Filters</h3>
+        <form id="filters">
+          <div class="field">
+            <label>Keyword</label>
+            <input name="q" value="${esc(params.get('q')||'')}" placeholder="Project, locality">
+          </div>
+          ${[['state','State'],['district','District'],['city','City'],['village','Village'],['locality','Locality'],['pincode','PIN Code']].map(([n,l])=>`
+            <div class="field">
+              <label>${l}</label>
+              <input name="${n}" value="${esc(params.get(n)||'')}" placeholder="${l}">
+            </div>`).join('')}
+          <div class="field">
+            <label>Property Type</label>
+            <select name="category">
+              <option value="">All types</option>
+              ${['Apartment','Villa','Independent House','Residential Plot','Commercial Plot','Office Space','Shop','Warehouse'].map(x=>`<option value="${x}" ${params.get('category')===x?'selected':''}>${x}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Budget minimum (₹)</label>
+            <input name="min" type="number" min="0" value="${esc(params.get('min')||'')}">
+          </div>
+          <div class="field">
+            <label>Budget maximum (₹)</label>
+            <input name="max" type="number" min="0" value="${esc(params.get('max')||'')}">
+          </div>
+          <div class="field">
+            <label>BHK</label>
+            <select name="bhk">
+              <option value="">Any</option>
+              ${[1,2,3,4,5].map(n=>`<option value="${n}" ${params.get('bhk')==n?'selected':''}>${n} BHK</option>`).join('')}
+            </select>
+          </div>
+          ${path==='/rent'?`
+          <div class="field"><label>Monthly Rent Maximum (₹)</label><input name="monthlyMax" type="number" min="0" value="${esc(params.get('monthlyMax')||'')}"></div>
+          <div class="field"><label>Security Deposit Maximum (₹)</label><input name="depositMax" type="number" min="0" value="${esc(params.get('depositMax')||'')}"></div>
+          <div class="field"><label>Furnishing</label><select name="furnishing"><option value="">Any</option><option ${params.get('furnishing')==='Furnished'?'selected':''}>Furnished</option><option ${params.get('furnishing')==='Semi-Furnished'?'selected':''}>Semi-Furnished</option><option ${params.get('furnishing')==='Unfurnished'?'selected':''}>Unfurnished</option></select></div>
+          <div class="field"><label>Available From</label><input name="availableFrom" type="date" value="${esc(params.get('availableFrom')||'')}"></div>
+          <div class="field"><label>Tenant Preference</label><select name="tenantPreference"><option value="">Any</option><option>Family</option><option>Bachelor</option><option>Working Professionals</option><option>Students</option></select></div>
+        `:''}
+        ${path==='/pg'?`
+          <div class="field"><label>Monthly Budget Maximum (₹)</label><input name="monthlyMax" type="number" min="0" value="${esc(params.get('monthlyMax')||'')}"></div>
+          <div class="field"><label>PG For</label><select name="pgGender"><option value="">Any</option><option>Male</option><option>Female</option><option>Co-living</option></select></div>
+          <div class="field"><label>Room Type</label><select name="roomType"><option value="">Any</option><option>Single</option><option>Double Sharing</option><option>Triple Sharing</option></select></div>
+          <div class="field"><label>Meals Included</label><select name="meals"><option value="">Any</option><option value="yes">Yes</option></select></div>
+        `:''}
+
+          <button class="btn" type="submit">Apply filters</button>
+          <a class="btn light" href="${path}">Clear filters</a>
+        </form>
+      </aside>
+      <section>
+        <div class="results-top">
+          <div>
+            <b id="resultCount">Properties</b>
+            <div class="muted">Search results from the platform database</div>
+          </div>
+          <select id="sort">
+            <option value="newest" ${params.get('sort')==='newest'?'selected':''}>Newest first</option>
+            <option value="low" ${params.get('sort')==='low'?'selected':''}>Price: Low to High</option>
+            <option value="high" ${params.get('sort')==='high'?'selected':''}>Price: High to Low</option>
+            <option value="area" ${params.get('sort')==='area'?'selected':''}>Largest area</option>
+          </select>
+        </div>
+        <div id="results" class="propertylist">
+          <div class="empty">Loading...</div>
+        </div>
+        <div id="pagination" class="pagination"></div>
+      </section>
+    </main>`);
+
+  $('#filters').onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const p = new URLSearchParams();
+    for(const [k,v] of f) if(v) p.set(k,v);
+    if(f.get('tenantPreference'))p.set('tenant_preference',f.get('tenantPreference'));
+    location.href = path + (p.toString() ? '?' + p.toString() : '');
+  };
+
+  $('#sort').onchange = () => {
+    const p = new URLSearchParams(location.search);
+    p.set('sort', $('#sort').value);
+    p.set('page', '1');
+    location.href = path + '?' + p.toString();
+  };
+
+  await loadResults();
+
+  async function loadResults(){
+    const p = new URLSearchParams(location.search);
+const page = Math.max(1, Number(p.get('page') || 1));
+
+p.set('page', String(page));
+
+const sortValue = $('#sort').value;
+if (sortValue) p.set('sort', sortValue);
+
+if (purpose) p.set('purpose', purpose);
+    try {
+      const d = await api('/api/properties?' + p.toString());
+      const pagination = d.pagination || {page:1, limit:12, total:d.properties.length, pages:1};
+
+      $('#resultCount').textContent = `${pagination.total} properties found`;
+      $('#results').innerHTML = d.properties.map(propertyCard).join('') ||
+        '<div class="empty">No properties match these filters. Try changing your search.</div>';
+
+      const holder = $('#pagination');
+      if(!holder) return;
+
+      if(pagination.pages <= 1){
+        holder.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+      if(page > 1) html += `<button type="button" data-page="${page-1}">Previous</button>`;
+
+      for(let i=1; i<=pagination.pages; i++){
+        html += `<button type="button" data-page="${i}" class="${i===page?'active':''}">${i}</button>`;
+      }
+
+      if(page < pagination.pages) html += `<button type="button" data-page="${page+1}">Next</button>`;
+
+      holder.innerHTML = html;
+      holder.querySelectorAll('button').forEach(btn => {
+        btn.onclick = () => {
+          p.set('page', btn.dataset.page);
+          location.href = path + '?' + p.toString();
+        };
+      });
+    } catch(e) {
+      $('#results').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+      $('#pagination').innerHTML = '';
+    }
+  }
+}
+
+
+async function detail(id){
+  try{
+    const {property:p}=await api('/api/properties/'+id);
+    const isRented = p.status === 'rented';
+
+    layout(`
+      ${pageHero(
+        esc(p.title),
+        'Property overview',
+        'Properties / Details'
+      )}
+
+      <main class="container detail-page">
+        <div class="grid detail-main">
+
+          <div class="card detail-image-card">
+            <div class="detail-photo-gallery">
+              ${(p.images||[]).length ? (p.images||[]).map((image,index)=>`<img class="detail-property-photo ${index===0?'detail-photo-main':''}" src="${esc(image.image_url)}" alt="${esc(p.title)} photo ${index+1}" loading="${index===0?'eager':'lazy'}">`).join('') : `<div class="detail-property-image"><span class="detail-house-icon">🏠</span><span class="detail-image-label">Property Preview</span></div>`}
+            </div>
+          </div>
+
+          <div class="panel detail-info-panel">
+
+            <span class="badge detail-status">
+              ${isRented ? 'RENTED / ભાડે અપાઈ ગઈ છે' : esc(p.status||'LISTING')}
+            </span>
+
+            <h2>${esc(p.title)}</h2>
+
+            <div class="price detail-price">
+              ${money(p.price)}
+            </div>
+
+            <p class="detail-location">
+              📍 ${esc([
+                p.locality,p.city,p.district,p.state,p.pincode
+              ].filter(Boolean).join(', '))}
+            </p>
+
+            <div class="detail-facts">
+              <span>📐 ${esc(p.area||'—')} sq.ft</span>
+              <span>🏠 ${esc(p.bhk||'—')} BHK</span>
+              <span>🏢 ${esc(p.category||'Property')}</span>
+            </div>
+
+            <p class="muted detail-description">
+              ${esc(p.description||'No description provided')}
+            </p>
+<div class="detail-actions">
+  ${isRented ? `
+    <button class="btn" disabled>
+      RENTED – Request Closed
+    </button>
+  ` : me ? `
+    
+<button class="detail-contact-btn"
+  type="button"
+  onclick="enquire(${Number(p.id)})">
+  Send Enquiry →
+</button>
+
+    <button class="detail-visit-btn"
+      onclick="visit(${Number(p.id)})">
+      Schedule Site Visit
+    </button>
+
+   
+${['buyer', 'tenant'].includes(String(me.role || '').toLowerCase()) ? `
+      <button class="btn detail-purchase-btn" type="button"
+onclick="purchaseRequest(${Number(p.id)}, '${String(p.purpose || 'buy').toLowerCase() === 'rent' ? 'rent' : 'buy'}')">        ${String(p.purpose || 'buy').toLowerCase() === 'rent'
+          ? 'Rental Request →'
+          : 'Purchase Request →'}
+      </button>
+    ` : ''}
+ ` : `
+    <a class="btn detail-contact-btn" href="/login">
+      Login to Contact Owner →
+    </a>
+  `}
+</div>
+            <p class="detail-secure-note">
+              🔒 Your enquiry is securely submitted to the platform
+            </p>
+          </div>
+        </div>
+
+        <div class="panel detail-extra-panel">
+          <h3>Property Information</h3>
+
+          <div class="detail-extra-grid">
+            <div>
+              <small>Purpose</small>
+              <strong>${esc(p.purpose||'Not specified')}</strong>
+            </div>
+            <div>
+              <small>Furnishing</small>
+              <strong>${esc(p.furnishing||'Not specified')}</strong>
+            </div>
+            <div>
+              <small>RERA Number</small>
+              <strong>${esc(p.rera_number||'Not provided')}</strong>
+            </div>
+            <div>
+              <small>Listing Contact</small>
+              <strong>${esc(p.lister||'Platform user')}</strong>
+            </div>
+          </div>
+        </div>
+      </main>
+    `);
+
+  }catch(e){
+    layout(`
+      ${pageHero('Property not found','This listing may be unavailable.')}
+      <main class="container">
+        <div class="empty">${esc(e.message)}</div>
+      </main>
+    `);
+  }
+}
+
+
+
+function authPage(register=false){
+  layout(`
+    ${pageHero(
+      register?'Create your account':'Welcome back',
+      register?'Join Microtechnique Buildtech':'Login to your account',
+      register?'Register':'Login'
+    )}
+
+    <main class="formwrap panel">
+      <h1>${register?'Registration':'Login'}</h1>
+
+      <form id="authform">
+        ${register ? `
+          <div class="field">
+            <label>Full name</label>
+            <input name="name" required>
+          </div>
+
+          <div class="field">
+            <label>Mobile number</label>
+            <input name="phone" type="tel">
+          </div>
+
+          <div class="field">
+            <label>Account type</label>
+            <select name="role" required>
+              <option value="buyer">Buyer / Renter</option>
+              <option value="owner">Property Owner</option>
+              <option value="builder">Builder / Developer</option>
+              <option value="channel_partner">Channel Partner</option>
+              <option value="investor">Investor</option>
+            </select>
+          </div>
+        ` : ''}
+
+        <div class="field">
+          <label>Email</label>
+          <input name="email" type="email" required>
+        </div>
+
+        <div class="field">
+          <label>Password ${register?'(minimum 8 characters)':''}</label>
+
+         <div class="password-field">
+  <input
+    id="authPassword"
+    name="password"
+    type="password"
+    minlength="8"
+    required
+  >
+  <span
+    id="togglePassword"
+    class="password-eye"
+    role="button"
+    tabindex="0"
+    aria-label="Show password"
+    title="Show password"
+  >
+    <svg viewBox="0 0 24 24" width="21" height="21"
+      fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  </span>
+</div>
+          ${register ? `
+            <small class="muted">
+              Use 8+ characters with uppercase, lowercase, number and special character.
+            </small>
+          ` : ''}
+        </div>
+
+        <button class="btn" type="submit">
+          ${register?'Create account':'Login'}
+        </button>
+      </form>
+
+      <p class="muted">
+        ${register?'Already registered?':'New to Microtechnique Buildtech?'}
+        <a id="authSwitch" href="${register?'/login':'/register'}">
+          ${register?'Login':'Create account'}
+        </a>
+      </p>
+
+      ${register ? `
+        <div class="notice">
+          Email OTP, SMS OTP and password recovery require external email/SMS configuration before production.
+        </div>
+      ` : ''}
+    </main>
+  `);
+
+  // Show / Hide Password
+ const passwordInput = $('#authPassword');
+const toggleButton = $('#togglePassword');
+
+function togglePasswordVisibility(){
+  const hidden = passwordInput.type === 'password';
+
+  passwordInput.type = hidden ? 'text' : 'password';
+
+  toggleButton.innerHTML = hidden
+    ? '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0112 5c6.4 0 10 7 10 7a15 15 0 01-3.2 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7c1.5 0 2.8-.3 4-.8"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+  toggleButton.setAttribute(
+    'aria-label',
+    hidden ? 'Hide password' : 'Show password'
+  );
+}
+
+toggleButton.onclick = togglePasswordVisibility;
+toggleButton.onkeydown = e => {
+  if(e.key === 'Enter' || e.key === ' '){
+    e.preventDefault();
+    togglePasswordVisibility();
+  }
+};
+
+  // Login / Registration navigation
+  $('#authSwitch').onclick = e => {
+    e.preventDefault();
+    location.href = register ? '/login' : '/register';
+  };
+
+  // Form submit
+  $('#authform').onsubmit = async e => {
+    e.preventDefault();
+
+    const b = Object.fromEntries(new FormData(e.target));
+
+    if(register){
+      const strongPassword =
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+      if(!strongPassword.test(b.password)){
+        return toast(
+          'Password must have 8+ characters, uppercase, lowercase, number and special character.'
+        );
+      }
+    }
+
+    try{
+      const d = await api(
+        register ? '/api/register' : '/api/login',
+        {
+          method:'POST',
+          body:JSON.stringify(b)
+        }
+      );
+
+      me = d.user;
+      toast('Account ready');
+
+      location.href = me.role === 'admin'
+        ? '/admin/dashboard'
+        : '/dashboard';
+
+    }catch(x){
+      toast(x.message);
+    }
+  };
+}
+async function getOwnerProperty(id){
+  const result = await api('/api/owner/properties');
+  return (result.properties || []).find(p => Number(p.id) === Number(id));
+}
+
+// VIEW PROPERTY
+async function viewOwnerProperty(id){
+  try{
+    const p = await getOwnerProperty(id);
+    if(!p) return alert('Property not found');
+
+    alert(
+      'PROPERTY DETAILS\n\n' +
+      'Title: ' + p.title +
+      '\nCategory: ' + p.category +
+      '\nPurpose: ' + p.purpose +
+      '\nPrice: ₹' + Number(p.price).toLocaleString('en-IN') +
+      '\nCity: ' + p.city +
+      '\nState: ' + p.state +
+      '\nLocality: ' + p.locality +
+      '\nArea: ' + p.area + ' sq.ft' +
+      '\nBHK: ' + p.bhk +
+      '\nStatus: ' + p.status +
+      '\nDescription: ' + (p.description || '-')
+    );
+  }catch(e){
+    alert('Unable to load property: ' + e.message);
+  }
+}
+
+// EDIT PROPERTY
+async function editOwnerProperty(id){
+  try{
+    const p = await getOwnerProperty(id);
+    if(!p) return alert('Property not found');
+
+    const title = prompt('Enter Property Title:', p.title);
+    if(title === null) return;
+
+    const city = prompt('Enter City:', p.city);
+    if(city === null) return;
+
+    const locality = prompt('Enter Locality:', p.locality);
+    if(locality === null) return;
+
+    const price = prompt('Enter Property Price:', p.price);
+    if(price === null) return;
+
+    if(!title.trim() || !city.trim() || !locality.trim() ||
+       !Number.isFinite(Number(price)) || Number(price) <= 0){
+      return alert('Please enter valid property details.');
+    }
+
+    await api('/api/owner/properties/' + id,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        ...p,
+        title:title.trim(),
+        city:city.trim(),
+        locality:locality.trim(),
+        price:Number(price)
+      })
+    });
+
+    alert('Property updated. It is now pending admin review.');
+    location.reload();
+
+  }catch(e){
+    alert('Update failed: ' + e.message);
+  }
+}
+
+// DELETE PROPERTY
+async function deleteOwnerProperty(id){
+  if(!confirm('Are you sure you want to delete this property?')){
+    return;
+  }
+
+  try{
+    await api('/api/owner/properties/' + id,{
+      method:'DELETE'
+    });
+
+    alert('Property deleted successfully.');
+    location.reload();
+
+  }catch(e){
+    alert('Delete failed: ' + e.message);
+  }
+}
+async function dashboard(adminMode=false){
+  if(!me){
+    location.href='/login';
+    return;
+  }
+
+  if(adminMode && !['admin','super_admin'].includes(me.role)){
+    layout(`${pageHero('Access Denied','Administrator access is required.')}`);
+    return;
+  }
+
+  const currentPath=location.pathname;
+  const ownerPage = currentPath === '/owner/properties'
+  ? 'properties'
+  : currentPath === '/dashboard/favourites'
+    ? 'favourites'
+    : currentPath === '/dashboard/enquiries'
+      ? 'enquiries'
+      : 'overview';
+  const adminMenu=[
+  {name:'Overview',path:'/admin/dashboard',icon:'▦'},
+  {name:'Users',path:'/admin/users',icon:'♙'},
+  {name:'Properties',path:'/admin/properties',icon:'⌂'},
+  {name:'My Properties',path:'/admin/my-properties',icon:'⌂'},
+  {name:'Purchase Requests',path:'/admin/purchases',icon:'₹'},
+  {name:'Post Property',path:'/post-property',icon:'＋'},
+  {name:'Verification',path:'/admin/verifications',icon:'✓'},
+  {name:'Enquiries',path:'/admin/enquiries',icon:'✉'},
+  {name:'Loans',path:'/admin/loans',icon:'₹'},
+  {name:'Services',path:'/admin/services',icon:'⚙'},
+  {name:'Partner Leads',path:'/admin/partners',icon:'↗'},
+  {name:'Investor Enquiries',path:'/admin/investors',icon:'₹'},
+  {name:'Featured Offers',path:'/admin/featured-offers',icon:'★'},
+  {name:'Partner Commissions',path:'/admin/partner-commissions',icon:'%'}
+];
+  
+const userMenu = [
+  {name:'Overview',path:'/dashboard'},
+
+  ...(me.role === 'owner'
+    ? [
+        {name:'My Properties',path:'/owner/properties'},
+        {name:'Property Enquiries',path:'/owner/enquiries'},
+        {name:'Purchase Requests',path:'/owner/purchases'},
+        {name:'Post Property',path:'/post-property'}
+      ]
+    : []),
+
+  ...(me.role === 'buyer' || me.role === 'tenant'
+    ? [
+        {name:'My Properties',path:'/dashboard/my-properties'},
+        {name:'Favourites',path:'/dashboard/favourites'},
+        {name:'My Enquiries',path:'/dashboard/enquiries'}
+      ]
+    : []),
+
+  ...(me.role === 'builder'
+    ? [{name:'Builder Projects',path:'/builder/projects'}]
+    : []),
+
+  ...(me.role === 'channel_partner'
+    ? [
+        {name:'My Referrals',path:'/partner/referrals'},
+        {name:'Commissions',path:'/partner/commissions'}
+      ]
+    : []),
+
+  ...(me.role === 'investor'
+    ? [{name:'Investment Enquiries',path:'/investor/opportunities'}]
+    : [])
+];
+
+  const menu=adminMode?adminMenu:userMenu;
+
+  function showShell(content,title){
+    layout(`
+      ${pageHero(title,`Welcome, ${esc(me.name)} · ${esc(['buyer', 'tenant'].includes(String(me.role || '').toLowerCase()) ? 'Buyer / Renter' : me.role)}`,'Dashboard')}
+      <main class="container admin-shell">
+        <aside class="panel admin-sidebar">
+          <h3>${adminMode?'Admin Control Center':'Account Menu'}</h3>
+          ${menu.map(item=>`
+            <a class="admin-nav-link ${currentPath===item.path?'active':''}"
+               href="${item.path}">
+              <span>${item.icon||'›'}</span>${item.name}
+            </a>
+          `).join('')}
+          <a class="admin-nav-link logout-link" href="#" id="adminLogout">
+            <span>↪</span> Logout
+          </a>
+        </aside>
+        <section class="admin-content">
+          ${content}
+        </section>
+      </main>
+    `);
+
+    const logoutButton=$('#adminLogout');
+    if(logoutButton){
+      logoutButton.onclick=e=>{
+        e.preventDefault();
+        logout();
+      };
+    }
+  }
+
+  function displayValue(value){
+    if(value===null||value===undefined||value==='')return '—';
+    if(typeof value==='object'){
+      if(Array.isArray(value))return value.map(displayValue).join(', ');
+      return JSON.stringify(value);
+    }
+    return String(value);
+  }
+
+  function renderRecords(records){
+    if(!records.length){
+      return '<div class="panel admin-empty">No records found.</div>';
+    }
+
+    return `
+      <div class="admin-record-grid">
+        ${records.map(record=>{
+          const entries=Object.entries(record)
+            .filter(([key,value])=>
+              !['password','password_hash','token','secret'].includes(key.toLowerCase())
+              && value!==null && typeof value!=='object'
+            )
+            .slice(0,10);
+
+          const title=record.name||record.title||record.email||
+            record.full_name||record.id||'Record';
+
+          return `
+            <article class="panel admin-record-card">
+              <h3>${esc(displayValue(title))}</h3>
+              ${entries.map(([key,value])=>`
+                <div class="admin-record-row">
+                  <span>${esc(key.replaceAll('_',' '))}</span>
+                  <strong>${esc(displayValue(value))}</strong>
+                </div>
+              `).join('')}
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  if(adminMode){
+    const adminPages={
+      '/admin/verifications':{
+  title:'Owner / Builder Verification',
+  description:'Review and verify Property Owners and Builders.',
+  endpoint:'/api/admin/verifications',
+  key:'requests'
+},
+      '/admin/users':{
+        title:'User Management',
+        description:'View registered platform users.',
+        endpoint:'/api/admin/users',
+        key:'users'
+      },
+      '/admin/enquiries':{
+        title:'Enquiry Management',
+        description:'View property enquiries received by the platform.',
+        endpoint:'/api/admin/enquiries',
+        key:'enquiries'
+      },
+      '/admin/loans':{
+        title:'Loan Applications',
+        description:'View submitted loan applications.',
+        endpoint:'/api/admin/loans',
+        key:'loans'
+      },
+      '/admin/services':{
+        title:'Service Management',
+        description:'View submitted service requests.',
+        endpoint:'/api/admin/services',
+        key:'services'
+      }
+    };
+
+    if(currentPath==='/admin/dashboard'||currentPath==='/admin'){
+      let data={};
+
+      try{
+        data=await api('/api/admin/overview');
+      }catch(e){
+        toast(e.message);
+      }
+
+      const metrics=Object.entries(data)
+        .filter(([key,value])=>typeof value==='number')
+        .map(([key,value])=>`
+          <article class="panel admin-metric-card">
+            <span>${esc(key.replaceAll('_',' '))}</span>
+            <strong>${value}</strong>
+          </article>
+        `).join('');
+
+      showShell(`
+        <div class="admin-page-heading">
+          <div>
+            <h2>Admin Dashboard</h2>
+            <p class="muted">Manage your Microtechnique Buildtech platform.</p>
+          </div>
+          <span class="admin-live-label">● Admin Panel</span>
+        </div>
+
+        <div class="admin-metric-grid">
+          ${metrics||'<div class="panel">No overview statistics available.</div>'}
+        </div>
+
+        <div class="panel admin-welcome-card">
+          <h2>Platform Control Center</h2>
+          <p>Choose a section from the Admin Menu to manage platform activity.</p>
+          <p class="muted">Review submitted properties before publishing them.</p>
+        </div>
+      `,'Admin Overview');
+
+      return;
+    }
+
+    const page=adminPages[currentPath];
+
+    if(page){
+      showShell(`
+        <div class="admin-page-heading">
+          <div>
+            <h2>${page.title}</h2>
+            <p class="muted">${page.description}</p>
+          </div>
+          <button class="secondary" id="adminRefresh">↻ Refresh</button>
+        </div>
+        <div id="adminRecords">Loading records...</div>
+      `,page.title);
+
+     
+async function loadRecords(){
+  const holder = $('#adminRecords');
+  if(!holder) return;
+
+  holder.innerHTML = '<div class="panel admin-loading">Loading records...</div>';
+
+  try {
+    const result = await api(page.endpoint);
+
+    const records = Array.isArray(result)
+      ? result
+      : Array.isArray(result[page.key])
+        ? result[page.key]
+        : Object.values(result).find(Array.isArray) || [];
+
+    if(page.key === 'requests') {
+      if(!records.length) {
+        holder.innerHTML = '<div class="panel admin-empty">No verification requests found.</div>';
+        return;
+      }
+
+      holder.innerHTML = `
+        <div class="admin-record-grid">
+          ${records.map(r => {
+            const status = ['approved','rejected'].includes(r.status)
+              ? r.status : 'pending';
+
+            return `
+              <article class="panel admin-record-card" data-verification-id="${Number(r.id)}">
+                <h3>${esc(r.name || 'User')}</h3>
+                <p>Account: ${esc(r.account_type)}</p>
+                <p>Email: ${esc(r.email || '—')}</p>
+                <p>Phone: ${esc(r.phone || '—')}</p>
+                <p>Details: ${esc(r.details || '—')}</p>
+                <p>Status: <strong>${status.toUpperCase()}</strong></p>
+
+                <div class="admin-status-actions">
+                  <button class="btn" data-verification-status="approved"
+                    ${status === 'approved' ? 'disabled' : ''}>
+                    ✓ Approve
+                  </button>
+
+                  <button class="btn" data-verification-status="rejected"
+                    ${status === 'rejected' ? 'disabled' : ''}>
+                    ✕ Reject
+                  </button>
+                </div>
+              </article>
+            `;
+          }).join('')}
+        </div>
+      `;
+
+      holder.querySelectorAll('[data-verification-status]').forEach(btn => {
+        btn.onclick = async () => {
+          const card = btn.closest('[data-verification-id]');
+          const id = card.dataset.verificationId;
+          const status = btn.dataset.verificationStatus;
+
+          if(!confirm(`Are you sure you want to ${status} this verification?`)) return;
+
+          try {
+            btn.disabled = true;
+
+            await api(`/api/admin/verifications/${id}/status`, {
+              method: 'PATCH',
+              body: JSON.stringify({status})
+            });
+
+            toast(`Verification ${status} successfully.`);
+            await loadRecords();
+
+          } catch(e) {
+            btn.disabled = false;
+            toast(e.message || 'Unable to update verification.');
+          }
+        };
+      });
+
+    } else {
+      holder.innerHTML = renderRecords(records);
+    }
+
+  } catch(e) {
+    holder.innerHTML = `
+      <div class="panel admin-error">
+        <h3>Unable to load ${page.title}</h3>
+        <p>${esc(e.message)}</p>
+        <button class="secondary" id="adminRetry">Try Again</button>
+      </div>
+    `;
+
+    const retry = $('#adminRetry');
+    if(retry) retry.onclick = loadRecords;
+   }
+}
+
+      $('#adminRefresh').onclick = loadRecords;
+      await loadRecords();
+      return;
+    }
+  }
+  // ======================================
+// BUYER: MY PURCHASED PROPERTIES
+// ======================================
+if(!adminMode && currentPath === '/dashboard/my-properties'){
+
+  if(!['buyer','tenant'].includes(me.role)){
+    location.href='/dashboard';
+    return;
+  }
+
+  showShell(`
+    <div class="admin-page-heading">
+      <h2>My Purchased Properties</h2>
+      <a class="btn" href="/buy">Explore Properties</a>
+    </div>
+    <div id="purchasedProperties">Loading...</div>
+  `,'My Properties');
+
+  try{
+    const result = await api('/api/my/properties');
+    const properties = result.properties || [];
+
+    $('#purchasedProperties').innerHTML = properties.length
+      ? `<div class="grid">
+          ${properties.map(p => `
+            <article class="panel admin-record-card">
+              <h3>${esc(p.title)}</h3>
+<h2>${money(p.property_price)}</h2>
+              <p>${esc([p.locality,p.city,p.state].filter(Boolean).join(', '))}</p>
+              <p><b>Purchase Status:</b> Approved</p>
+              <p><b>Purchase Date:</b> ${esc(p.purchased_at || '—')}</p>
+              <a class="btn secondary" href="/property/${Number(p.id)}">
+                View Property
+              </a>
+            </article>
+          `).join('')}
+        </div>`
+      : '<div class="panel">You have no approved purchased properties yet.</div>';
+
+  }catch(e){
+    $('#purchasedProperties').innerHTML =
+      `<div class="panel">${esc(e.message)}</div>`;
+  }
+
+  return;
+}
+
+  // ADMIN: MY PROPERTY LISTINGS
+  if(adminMode && currentPath === '/admin/my-properties'){
+
+    showShell(`
+      <div class="admin-page-heading">
+        <h2>My Properties</h2>
+        <a class="btn" href="/post-property">+ Post Property</a>
+      </div>
+      <div id="adminMyProperties">Loading...</div>
+    `,'My Properties');
+
+    try{
+      const result = await api('/api/my-properties');
+      const properties = result.properties || [];
+
+      $('#adminMyProperties').innerHTML = properties.length
+        ? `<div class="grid">
+            ${properties.map(p => `
+              <article class="panel admin-record-card">
+                <h3>${esc(p.title)}</h3>
+                <h2>${money(p.price)}</h2>
+                <p>${esc([p.locality,p.city,p.state].filter(Boolean).join(', '))}</p>
+                <p><b>Status:</b> ${esc(p.status || 'Pending')}</p>
+                <a class="btn secondary" href="/property/${Number(p.id)}">View</a>
+              </article>
+            `).join('')}
+          </div>`
+        : '<div class="panel">You have not posted any properties yet.</div>';
+
+    }catch(e){
+      $('#adminMyProperties').innerHTML =
+        `<div class="panel">${esc(e.message)}</div>`;
+    }
+
+    return;
+  }
+
+
+// ======================================
+// OWNER: MY PROPERTY LISTINGS
+// ======================================
+if(!adminMode && currentPath === '/owner/properties'){
+
+  if(me.role !== 'owner'){
+    location.href='/dashboard';
+    return;
+  }
+
+  showShell(`
+    <div class="admin-page-heading">
+      <h2>My Property Listings</h2>
+      <a class="btn" href="/post-property">+ Post Property</a>
+    </div>
+    <div id="ownerProperties">Loading...</div>
+  `,'My Properties');
+
+  try{
+    const result = await api('/api/owner/properties');
+    const properties = result.properties || [];
+
+    $('#ownerProperties').innerHTML = properties.length
+      ? `<div class="grid">
+          ${properties.map(p => `
+            <article class="panel admin-record-card">
+              <h3>${esc(p.title)}</h3>
+<h2>${money(p.property_price)}</h2>
+              <p>${esc([p.locality,p.city,p.state].filter(Boolean).join(', '))}</p>
+              <p><b>Status:</b> ${esc(p.status || 'Pending')}</p>
+
+<div class="owner-property-actions">
+  <a class="btn secondary" href="/property/${Number(p.id)}">
+    View
+  </a>
+
+  <button class="btn danger"
+    onclick="deleteOwnerProperty(${Number(p.id)})">
+    Delete
+  </button>
+</div>
+            </article>
+          `).join('')}
+        </div>`
+      : '<div class="panel">You have not posted any properties yet.</div>';
+
+  }catch(e){
+    $('#ownerProperties').innerHTML =
+      `<div class="panel">${esc(e.message)}</div>`;
+  }
+
+  return;
+}
+
+window.deleteOwnerProperty = async function(propertyId) {
+  if (!confirm('Are you sure you want to delete this property?')) {
+    return;
+  }
+
+  try {
+   await api(`/api/owner/properties/${propertyId}`, {
+  method: 'DELETE'
+});   
+    alert('Property deleted successfully.');
+    location.reload();
+  } catch (e) {
+    alert(e.message || 'Unable to delete property.');
+  }
+};
+
+
+
+// ======================================
+// OWNER: PROPERTY ENQUIRIES
+// ======================================
+if(!adminMode && currentPath === '/owner/enquiries'){
+
+  if(me.role !== 'owner'){
+    location.href='/dashboard';
+    return;
+  }
+
+  showShell(`
+    <h2>Property Enquiries</h2>
+    <div id="ownerEnquiries">Loading...</div>
+  `,'Property Enquiries');
+
+  async function loadOwnerEnquiries(){
+    try{
+      const result = await api('/api/owner/enquiries');
+      const items = result.enquiries || [];
+
+      $('#ownerEnquiries').innerHTML = items.length
+        ? `<div class="admin-record-grid">
+            ${items.map(e => `
+              <article class="panel admin-record-card">
+                <h3>${esc(e.property_title || 'Property')}</h3>
+                <p><b>Customer:</b> ${esc(e.name || '—')}</p>
+                <p><b>Phone:</b> ${esc(e.phone || '—')}</p>
+                <p><b>Message:</b> ${esc(e.message || '—')}</p>
+                <p><b>Status:</b> ${esc(e.status || 'new')}</p>
+
+                <select data-enquiry-status="${Number(e.id)}">
+                  <option value="new" ${e.status==='new'?'selected':''}>New</option>
+                  <option value="contacted" ${e.status==='contacted'?'selected':''}>Contacted</option>
+                  <option value="closed" ${e.status==='closed'?'selected':''}>Closed</option>
+                </select>
+              </article>
+            `).join('')}
+          </div>`
+        : '<div class="panel">No enquiries received yet.</div>';
+
+      document.querySelectorAll('[data-enquiry-status]').forEach(select=>{
+        select.onchange = async ()=>{
+          try{
+            await api('/api/owner/enquiries/'+select.dataset.enquiryStatus+'/status',{
+              method:'PATCH',
+              body:JSON.stringify({status:select.value})
+            });
+            toast('Enquiry status updated');
+          }catch(e){
+            toast(e.message);
+          }
+        };
+      });
+
+    }catch(e){
+      $('#ownerEnquiries').innerHTML =
+        `<div class="panel">${esc(e.message)}</div>`;
+    }
+  }
+
+  await loadOwnerEnquiries();
+  return;
+}
+
+
+// ======================================
+// OWNER: PURCHASE REQUESTS
+// ======================================
+if(!adminMode && currentPath === '/owner/purchases'){
+
+  if(me.role !== 'owner'){
+    location.href='/dashboard';
+    return;
+  }
+
+  showShell(`
+    <h2>Purchase Requests</h2>
+    <div id="ownerPurchases">Loading...</div>
+  `,'Purchase Requests');
+
+  async function loadOwnerPurchases(){
+    try{
+      const result = await api('/api/owner/purchases');
+      const items = result.purchases || [];
+
+      $('#ownerPurchases').innerHTML = items.length
+        ? `<div class="admin-record-grid">
+            ${items.map(p => `
+              <article class="panel admin-record-card">
+                <h3>${esc(p.property_title)}</h3>
+<h2>${money(p.property_price)}</h2>
+                <p><b>Buyer:</b> ${esc(p.buyer_name)}</p>
+                <p><b>Email:</b> ${esc(p.buyer_email || '—')}</p>
+                <p><b>Owner Decision:</b> ${esc(p.owner_approval || 'pending')}</p>
+                <p><b>Admin Decision:</b> ${esc(p.admin_approval || 'pending')}</p>
+                <p><b>Status:</b> ${esc(p.status || 'pending')}</p>
+
+                ${p.status === 'pending' && p.owner_approval === 'pending' ? `
+                  <button class="btn" data-owner-decision="${Number(p.id)}" data-status="approved">
+                    Approve
+                  </button>
+                  <button class="secondary" data-owner-decision="${Number(p.id)}" data-status="rejected">
+                    Reject
+                  </button>
+                ` : ''}
+              </article>
+            `).join('')}
+          </div>`
+        : '<div class="panel">No purchase requests received.</div>';
+
+      document.querySelectorAll('[data-owner-decision]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          const id = btn.dataset.ownerDecision;
+          const status = btn.dataset.status;
+
+          if(!confirm('Are you sure you want to '+status+' this request?')) return;
+
+          try{
+            await api('/api/owner/purchases/'+id+'/approval',{
+              method:'PATCH',
+              body:JSON.stringify({status})
+            });
+            toast('Owner decision saved');
+            await loadOwnerPurchases();
+          }catch(e){
+            toast(e.message);
+          }
+        };
+      });
+
+    }catch(e){
+      $('#ownerPurchases').innerHTML =
+        `<div class="panel">${esc(e.message)}</div>`;
+    }
+  }
+
+  await loadOwnerPurchases();
+  return;
+}
+
+
+// ======================================
+// ADMIN: PURCHASE REQUESTS
+// ======================================
+if(adminMode && currentPath === '/admin/purchases'){
+
+  showShell(`
+    <h2>All Purchase Requests</h2>
+    <div id="adminPurchases">Loading...</div>
+  `,'Purchase Requests');
+
+  async function loadAdminPurchases(){
+    try{
+      const result = await api('/api/admin/purchases');
+      const items = result.purchases || [];
+
+      $('#adminPurchases').innerHTML = items.length
+        ? `<div class="admin-record-grid">
+            ${items.map(p => `
+              <article class="panel admin-record-card">
+                <h3>${esc(p.property_title)}</h3>
+<h2>${money(p.property_price)}</h2>
+                <p><b>Buyer:</b> ${esc(p.buyer_name)}</p>
+                <p><b>Owner:</b> ${esc(p.owner_name)}</p>
+                <p><b>Owner Approval:</b> ${esc(p.owner_approval || 'pending')}</p>
+                <p><b>Admin Approval:</b> ${esc(p.admin_approval || 'pending')}</p>
+                <p><b>Status:</b> ${esc(p.status || 'pending')}</p>
+
+                ${p.status === 'pending' && p.owner_approval === 'approved' ? `
+                  <button class="btn" data-admin-decision="${Number(p.id)}" data-status="approved">
+                    Final Approve
+                  </button>
+                ` : ''}
+
+                ${p.status === 'pending' ? `
+                  <button class="secondary" data-admin-decision="${Number(p.id)}" data-status="rejected">
+                    Reject
+                  </button>
+                ` : ''}
+              </article>
+            `).join('')}
+          </div>`
+        : '<div class="panel">No purchase requests found.</div>';
+
+      document.querySelectorAll('[data-admin-decision]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          const id = btn.dataset.adminDecision;
+          const status = btn.dataset.status;
+
+          if(!confirm('Are you sure you want to '+status+' this request?')) return;
+
+          try{
+            await api('/api/admin/purchases/'+id+'/approval',{
+              method:'PATCH',
+              body:JSON.stringify({status})
+            });
+            toast('Admin decision saved');
+            await loadAdminPurchases();
+          }catch(e){
+            toast(e.message);
+          }
+        };
+      });
+
+    }catch(e){
+      $('#adminPurchases').innerHTML =
+        `<div class="panel">${esc(e.message)}</div>`;
+    }
+  }
+
+  await loadAdminPurchases();
+  return;
+}
+// FAVOURITES PAGE
+
+/* =========================
+   BUYER MY FAVOURITES
+========================= */
+if(!adminMode && currentPath === '/dashboard/favourites'){
+
+  showShell(`
+    <div class="admin-page-heading">
+      <h2>My Favourites</h2>
+      <a class="btn" href="/buy">Explore Properties</a>
+    </div>
+    <div id="favouriteProperties">Loading favourites...</div>
+  `,'My Favourites');
+
+  try {
+    const result = await api('/api/favourites');
+    const properties = result.properties || [];
+
+    window.savedPropertyIds = properties.map(p => Number(p.id));
+
+    const favouriteCard = (p) => {
+      const locationText = [p.locality,p.city,p.state].filter(Boolean).join(', ');
+      const imageUrl = p.image_url || p.image || p.photo || '';
+
+      return `
+        <article class="card buy-property-card">
+          <div class="cardimg buy-card-image">
+            ${imageUrl
+              ? `<img src="${esc(imageUrl)}" alt="${esc(p.title)}">`
+              : `<div class="property-image-placeholder">🏠</div>`}
+            <a class="property-image-details" href="/property/${Number(p.id)}">View Details →</a>
+            <button type="button" class="buy-favourite-btn is-saved"
+              onclick="saveFav(${Number(p.id)})">♥</button>
+          </div>
+          <div class="cardbody">
+            <h3>${esc(p.title)}</h3>
+            <div class="price">${money(p.price)}</div>
+            <p class="muted">📍 ${esc(locationText || 'India')}</p>
+            <div class="buy-property-facts">
+              <span>${esc(p.area || '—')} sq.ft</span>
+              <span>${esc(p.bhk || '—')} BHK</span>
+              <span>${esc(p.category || 'Property')}</span>
+            </div>
+            <p class="muted">${esc(p.description || 'Property details available on request')}</p>
+            <a class="btn secondary" href="/property/${Number(p.id)}">View Details →</a>
+          </div>
+        </article>
+      `;
+    };
+
+    $('#favouriteProperties').innerHTML = properties.length
+      ? `<div class="grid">${properties.map(favouriteCard).join('')}</div>`
+      : '<div class="panel">No saved properties yet. Explore properties and save your favourites.</div>';
+
+  } catch(e) {
+    $('#favouriteProperties').innerHTML =
+      `<div class="panel">Unable to load favourites: ${esc(e.message)}</div>`;
+  }
+
+  return;
+}
+
+
+/* =========================
+   BUYER MY ENQUIRIES
+========================= */
+if(!adminMode && currentPath === '/dashboard/enquiries'){
+
+  showShell(`
+    <div class="admin-page-heading">
+      <h2>My Enquiries</h2>
+      <a class="btn" href="/buy">Explore Properties</a>
+    </div>
+    <div id="myEnquiryList">Loading enquiries...</div>
+  `,'My Enquiries');
+
+  try {
+    const result = await api('/api/my-enquiries');
+    const items = result.properties || [];
+
+    $('#myEnquiryList').innerHTML = items.length
+      ? `<div class="admin-record-grid">
+          ${items.map(p => `
+            <article class="panel admin-record-card">
+              <h3>${esc(p.title || 'Property')}</h3>
+              <p>${esc([p.locality,p.city,p.state].filter(Boolean).join(', '))}</p>
+              <h3>${money(p.price)}</h3>
+              <p><b>Enquiry Date:</b> ${esc(p.enquiry_created_at || '—')}</p>
+              <p><b>Your Message:</b> ${esc(p.enquiry_message || '—')}</p>
+              <p><b>Status:</b> ${esc(p.enquiry_status || 'New')}</p>
+              <a class="btn secondary" href="/property/${Number(p.property_id)}">View Property</a>
+            </article>
+          `).join('')}
+        </div>`
+      : '<div class="panel">You have not sent any property enquiries yet. Explore properties to get started.</div>';
+
+  } catch(e) {
+    $('#myEnquiryList').innerHTML =
+      `<div class="panel">Unable to load enquiries: ${esc(e.message)}</div>`;
+  }
+
+  return;
+}
+
+// BUYER / USER DASHBOARD OVERVIEW
+if (!adminMode && currentPath === '/dashboard') {
+  const isBuyerRenter = ['buyer', 'tenant'].includes(
+  String(me.role || '').toLowerCase()
+);
+
+const dashboardAccountType = isBuyerRenter
+  ? 'Buyer / Renter'
+  : me.role;
+
+const dashboardAccountStatus = isBuyerRenter
+  ? 'Active'
+  : me.verified
+    ? 'Verified'
+    : 'Pending Verification';
+
+  showShell(`
+    <div class="admin-page-heading">
+      <div>
+        <h2>Welcome, ${esc(me.name)}!</h2>
+        <p class="muted">Welcome to your Microtechnique Buildtech Dashboard.</p>
+      </div>
+    </div>
+
+    <div class="admin-metric-grid">
+      <article class="panel admin-metric-card">
+        <span>Account Type</span>
+<strong>${esc(dashboardAccountType)}</strong>
+      </article>
+
+      <article class="panel admin-metric-card">
+        <span>Account Status</span>
+<strong>${esc(dashboardAccountStatus)}</strong>
+      </article>
+    </div>
+
+    <div class="panel admin-welcome-card">
+      <h2>My Account</h2>
+      <p>Manage your property activities from here.</p>
+
+      <div class="actions">
+        <a class="btn" href="/buy">Explore Properties</a>
+        <a class="btn secondary" href="/dashboard/favourites">My Favourites</a>
+        <a class="btn secondary" href="/dashboard/enquiries">My Enquiries</a>
+      </div>
+    </div>
+  `, 'My Dashboard');
+
+  return;
+}
+
+}
+
+function postProperty(){
+  if(!me){location.href='/login';return}
+
+  if(!['owner','admin','super_admin'].includes(me.role)){
+    alert('Only Property Owners and Admin can submit property listings.');
+    location.href='/dashboard';
+    return;
+  }
+
+
+const canPostProperty = [
+  'owner',
+  'admin',
+  'super_admin'
+].includes(me.role);
+
+if (!canPostProperty) {
+  layout(`${pageHero(
+    'Property Posting',
+    'You can browse properties, but cannot submit a listing.',
+    'Property Posting'
+  )}
+    <section class="container">
+      <div class="panel">
+        <h3>Property Posting Not Available</h3>
+        <p>You can explore available properties and view property details.</p>
+        <a class="btn btn-primary" href="/buy">Browse Properties</a>
+      </div>
+    </section>`);
+  return;
+}
+
+  layout(`${pageHero('Post a Property','Submit your property for review.','Post Property')}
+    
+<style>
+.listing-form-wrap{
+  max-width:980px!important;
+  padding:26px!important;
+  border-radius:18px;
+  animation:formEnter .7s ease both;
+  box-shadow:0 12px 40px rgba(30,50,100,.09);
+  border:1px solid rgba(100,120,180,.12);
+}
+
+.listing-form-wrap h1{
+  font-size:25px;
+  font-weight:750;
+  background:linear-gradient(90deg,#4734c9,#168bd5);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation:titleEnter .8s ease both;
+}
+
+#postform .listing-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:13px 16px;
+}
+
+#postform .field{
+  margin-bottom:8px;
+  animation:fieldEnter .55s ease both;
+}
+
+#postform label{
+  font-size:12px;
+  font-weight:600;
+  margin-bottom:5px;
+  display:block;
+}
+
+#postform input,
+#postform select,
+#postform textarea{
+  width:100%;
+  min-height:40px;
+  padding:9px 12px;
+  font-size:13px;
+  border:1px solid #dce2f0;
+  border-radius:9px;
+  background:#fff;
+  transition:border-color .25s ease,
+             box-shadow .25s ease,
+             transform .25s ease;
+}
+
+#postform input:hover,
+#postform select:hover,
+#postform textarea:hover{
+  border-color:#a9a0ed;
+}
+
+#postform input:focus,
+#postform select:focus,
+#postform textarea:focus{
+  outline:none;
+  border-color:#6653dc;
+  box-shadow:0 0 0 4px rgba(102,83,220,.12);
+  transform:translateY(-1px);
+}
+
+#postform .wide{
+  grid-column:1/-1;
+}
+
+#postform textarea{
+  min-height:72px;
+  resize:vertical;
+}
+
+#postform .notice{
+  padding:11px 14px;
+  margin:12px 0;
+  border-radius:10px;
+  background:linear-gradient(110deg,#f1efff,#edf7ff);
+  border-left:3px solid #6653dc;
+  font-size:12px;
+  animation:fadeIn .7s ease both;
+}
+
+#postform .declaration{
+  font-size:12px;
+  line-height:1.6;
+  padding:12px;
+  border-radius:10px;
+  background:#f8f9ff;
+}
+
+#postform .declaration input{
+  width:auto;
+  min-height:auto;
+  margin-right:7px;
+  accent-color:#6653dc;
+}
+
+#postform button{
+  border:0;
+  border-radius:10px;
+  padding:12px 24px;
+  font-weight:650;
+  background:linear-gradient(110deg,#5844d6,#168bd5);
+  color:white;
+  box-shadow:0 5px 16px rgba(80,70,190,.22);
+  transition:transform .25s ease,
+             box-shadow .25s ease;
+}
+
+#postform button:hover{
+  transform:translateY(-3px);
+  box-shadow:0 9px 22px rgba(80,70,190,.30);
+}
+
+#postform button:active{
+  transform:scale(.97);
+}
+
+#reraNumberField{
+  animation:fadeIn .3s ease both;
+}
+
+@keyframes formEnter{
+  from{opacity:0;transform:translateY(22px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@keyframes titleEnter{
+  from{opacity:0;transform:translateX(-15px)}
+  to{opacity:1;transform:translateX(0)}
+}
+
+@keyframes fieldEnter{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+@keyframes fadeIn{
+  from{opacity:0}
+  to{opacity:1}
+}
+
+@media(max-width:760px){
+  #postform .listing-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:520px){
+  #postform .listing-grid{
+    grid-template-columns:1fr;
+  }
+  .listing-form-wrap{
+    padding:14px!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .listing-form-wrap,
+  .listing-form-wrap *,
+  #postform *{
+    animation:none!important;
+    transition:none!important;
+  }
+}
+  #reraNumberField[hidden] {
+  display: none !important;
+}
+</style>
+
+    <main class="formwrap panel listing-form-wrap">
+      <h1>Property listing form</h1>
+      <form id="postform">
+        <div class="listing-grid">
+          <div class="field"><label>Property title *</label><input name="title" maxlength="160" required></div>
+          <div class="field"><label>Purpose *</label><select name="purpose"><option value="buy">For Sale</option><option value="rent">For Rent</option><option value="new-project">New Project</option></select></div>
+          <div class="field"><label>Category *</label><select name="category">${['Apartment','Villa','Independent House','Residential Plot','Commercial Plot','Office Space','Shop','Warehouse','Agricultural Land','PG'].map(x=>`<option>${x}</option>`).join('')}</select></div>
+          <div class="field"><label>Price (₹) *</label><input name="price" type="number" min="1" required></div>
+          <div class="field"><label>Area (sq.ft)</label><input name="area" type="number" min="1" step="0.01"></div>
+          <div class="field"><label>BHK</label><input name="bhk" type="number" min="1" max="20"></div>
+          <div class="field"><label>State *</label><input name="state" required></div>
+          <div class="field"><label>District *</label><input name="district" required></div>
+          <div class="field"><label>City / Town *</label><input name="city" required></div>
+          <div class="field"><label>Village</label><input name="village"></div>
+          <div class="field"><label>Locality *</label><input name="locality" required></div>
+          <div class="field"><label>PIN Code *</label><input name="pincode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></div>
+          <div class="field wide"><label>Property address</label><input name="address" maxlength="300"></div>
+          <div class="field"><label>Furnishing</label><select name="furnishing"><option>Unfurnished</option><option>Semi-furnished</option><option>Furnished</option><option>Not applicable</option></select></div>
+          <div class="field"><label>Monthly Rent (₹, for rental)</label><input name="monthly_rent" type="number" min="0"></div>
+          <div class="field"><label>Security Deposit (₹)</label><input name="security_deposit" type="number" min="0"></div>
+          <div class="field"><label>Available From</label><input name="available_from" type="date"></div>
+          <div class="field"><label>Tenant Preference</label><select name="tenant_preference"><option value="">Any</option><option>Family</option><option>Bachelor</option><option>Working Professionals</option><option>Students</option></select></div>
+          <div class="field"><label>PG For</label><select name="pg_gender"><option value="">Not PG</option><option>Male</option><option>Female</option><option>Co-living</option></select></div>
+          <div class="field"><label>Room Type</label><select name="room_type"><option value="">Not PG</option><option>Single</option><option>Double Sharing</option><option>Triple Sharing</option></select></div>
+          <div class="field"><label>Sharing Type</label><input name="sharing_type" placeholder="Private / Shared"></div>
+          <div class="field"><label>Meals Included</label><select name="meals_included"><option value="no">No</option><option value="yes">Yes</option></select></div>
+
+          <div class="field"><label>RERA applicable? *</label><select name="rera_applicable" id="reraApplicable" required><option value="">Select</option><option value="yes">Yes</option><option value="no">No / Not applicable</option></select></div>
+          <div class="field" id="reraNumberField" hidden><label>RERA Number *</label><input name="rera_number" id="reraNumber" maxlength="100"></div>
+          <div class="field wide"><label>Description</label><textarea name="description" rows="2" maxlength="5000"></textarea></div>
+          <div class="field wide property-photo-upload-field">
+            <label for="propertyPhotos">Property Photos (up to 6 photos)</label>
+            <input id="propertyPhotos" name="property_photos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+            <small class="muted">JPG, PNG or WebP · Original photos are compressed automatically · First photo becomes the cover image.</small>
+            <div id="propertyPhotoPreview" class="property-photo-preview"></div>
+          </div>
+        </div>
+
+        <div class="notice">
+List only a property you own or are legally authorised to offer.
+          Admin approval is required before publication.
+        </div>
+
+        <div class="field declaration">
+          <label><input type="checkbox" name="ownership_declaration" value="yes" required>
+          I confirm that I own or am legally authorised to list this property/project and the details are accurate.</label>
+        </div>
+
+        <button class="btn" type="submit">Submit for admin review</button>
+      </form>
+      <p class="notice">Photos are compressed and saved with this property. Up to 6 photos can be added.</p>
+    </main>
+  `);
+
+  const reraSelect=$('#reraApplicable');
+  const reraWrap=$('#reraNumberField');
+  const reraInput=$('#reraNumber');
+
+  reraSelect.onchange=()=>{
+    const yes=reraSelect.value==='yes';
+    reraWrap.hidden=!yes;
+    reraInput.required=yes;
+    if(!yes)reraInput.value='';
+  };
+
+  const photoInput=$('#propertyPhotos');
+  const photoPreview=$('#propertyPhotoPreview');
+  photoInput.onchange=()=>{
+    const files=Array.from(photoInput.files||[]);
+    if(files.length>6){photoInput.value='';photoPreview.innerHTML='';return toast('Choose up to 6 photos per property.');}
+    for(const file of files){if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>12*1024*1024){photoInput.value='';photoPreview.innerHTML='';return toast('Use JPG, PNG or WebP photos under 12 MB each.');}}
+    photoPreview.innerHTML=files.map(file=>`<div class="property-photo-preview-item"><img src="${URL.createObjectURL(file)}" alt="Selected property photo"><span>${esc(file.name)}</span></div>`).join('');
+  };
+  $('#postform').onsubmit=async e=>{
+    e.preventDefault();
+    const photoFiles=Array.from(photoInput.files||[]);
+    const formData=Object.fromEntries([...new FormData(e.target)].filter(([key,value])=>!(value instanceof File)));
+    formData.rera_applicable=formData.rera_applicable==='yes';
+    const submitButton=e.target.querySelector('button[type="submit"],button:not([type])');
+    if(submitButton){submitButton.disabled=true;submitButton.textContent='Submitting property…';}
+    let createdPropertyId=null;
+    try{
+      const d=await api('/api/properties',{method:'POST',body:JSON.stringify(formData)});
+      createdPropertyId=Number(d.id);
+      if(photoFiles.length){if(submitButton)submitButton.textContent='Uploading photos…';await uploadPropertyImages(d.id,photoFiles);}
+      alert(photoFiles.length?'Property and photos submitted for admin review.':d.message);
+      location.href='/dashboard';
+    }catch(x){
+      if(createdPropertyId){
+        alert('Property #'+createdPropertyId+' was created, but photo upload did not finish. Please ask Admin to add the photos from Property Approval.');
+        location.href='/dashboard';
+      }else{
+        toast(x.message);
+        if(submitButton){submitButton.disabled=false;submitButton.textContent='Submit for admin review';}
+      }
+    }
+  };
+}
+
+
+function loans(){
+  const BUSINESS_WHATSAPP = '919226691111'; // અહીં તમારો WhatsApp નંબર નાખવો
+
+  layout(`${pageHero('Home Loans','Your dream home starts with the right step.','Home Loans')}
+  <main class="container home-loan-page">
+
+    <section class="hl-hero">
+      <div class="hl-hero-content">
+        <span class="hl-tag">HOME FINANCE • YOUR FUTURE HOME</span>
+        <h1>Make your <span>dream home</span><br>come closer.</h1>
+        <p>Explore home loan possibilities with Microtechnique Buildtech. Whether you are buying, building or upgrading your home, we help you take the next step with confidence.</p>
+        <div class="hl-pills">
+          <span>✓ Home Purchase</span>
+          <span>✓ Construction</span>
+          <span>✓ Balance Transfer</span>
+        </div>
+        <a class="hl-hero-btn" href="#hl-enquiry">Explore Home Loans <b>↗</b></a>
+      </div>
+
+      <div class="hl-art">
+        <div class="hl-glow"></div>
+        <div class="hl-circle hl-circle1"></div>
+        <div class="hl-circle hl-circle2"></div>
+        <div class="hl-house">
+          <div class="hl-roof"></div>
+          <div class="hl-house-body">
+            <div class="hl-window hl-window1"></div>
+            <div class="hl-door"></div>
+            <div class="hl-window hl-window2"></div>
+          </div>
+          <div class="hl-house-ground"></div>
+      </div>
+        <div class="hl-float hl-float1">
+          <span class="hl-float-icon">⌂</span>
+          <div><b>Your Dream Home</b><small>One step closer</small></div>
+        </div>
+        <div class="hl-float hl-float2">
+          <span class="hl-float-icon">₹</span>
+          <div><b>Plan Your EMI</b><small>Know your estimate</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="hl-intro hl-reveal">
+      <div>
+        <small class="hl-eyebrow">A HOME FOR YOUR TOMORROW</small>
+        <h2>Find the right direction<br>for your home loan.</h2>
+      </div>
+      <p>Looking to purchase a new home, buy a resale property, construct your own house or transfer an existing home loan? Share your requirement with Microtechnique Buildtech and explore the next steps for your home finance enquiry.</p>
+    </section>
+
+    <section class="hl-benefits hl-reveal">
+      <article><span>01</span><h3>Explore Loan Options</h3><p>Tell us what type of property or home finance you are looking for.</p></article>
+      <article><span>02</span><h3>Plan Your EMI</h3><p>Estimate your monthly repayment with our easy EMI calculator.</p></article>
+      <article><span>03</span><h3>Connect With Us</h3><p>Send your enquiry through WhatsApp for a follow-up.</p></article>
+    </section>
+
+    <section class="hl-workspace hl-reveal">
+      <div class="hl-calculator">
+        <small class="hl-eyebrow">SMART HOME FINANCE</small>
+        <h2>Calculate your EMI</h2>
+        <p class="hl-muted">Get an indicative monthly repayment estimate.</p>
+
+        <div class="field">
+          <label>Loan Amount (₹)</label>
+          <input id="amt" type="number" min="10000" value="4000000">
+        </div>
+        <div class="field">
+          <label>Annual Interest Rate (%)</label>
+          <input id="rate" type="number" min="0.1" max="30" step="0.1" value="8.5">
+        </div>
+        <div class="field">
+          <label>Loan Tenure (Years)</label>
+          <input id="years" type="number" min="1" max="40" value="20">
+        </div>
+
+        <button type="button" class="hl-calc-btn" onclick="calcEmi()">Calculate EMI <span>→</span></button>
+
+        <div class="hl-emi-box">
+          <small>Estimated Monthly EMI</small>
+          <h2 id="emiout">Monthly EMI: —</h2>
+          <span>Indicative estimate only</span>
+        </div>
+      </div>
+
+      <div class="hl-form-card" id="hl-enquiry">
+        <small class="hl-eyebrow">LET'S PLAN YOUR HOME</small>
+        <h2>Home Loan Enquiry</h2>
+        <p class="hl-muted">Fill in your details to continue on WhatsApp.</p>
+
+        <form id="hl-form">
+          <div class="hl-form-grid">
+            <div class="field">
+              <label>Full Name *</label>
+              <input name="name" required maxlength="100" placeholder="Enter your name">
+            </div>
+            <div class="field">
+              <label>Mobile Number *</label>
+              <input name="mobile" type="tel" inputmode="numeric" required pattern="[0-9 +()-]{10,18}" placeholder="Your mobile number">
+            </div>
+            <div class="field">
+              <label>City / Location *</label>
+              <input name="city" required maxlength="100" placeholder="Your city">
+            </div>
+            <div class="field">
+              <label>Loan Requirement *</label>
+              <select name="loan_type" required>
+                <option value="">Select loan type</option>
+                <option>Buy a new home</option>
+                <option>Resale property</option>
+                <option>Home construction</option>
+                <option>Balance transfer</option>
+                <option>Renovation / extension</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Approx. Loan Amount *</label>
+              <select name="loan_amount" required>
+                <option value="">Select amount</option>
+                <option>Below ₹10 lakh</option>
+                <option>₹10–25 lakh</option>
+                <option>₹25–50 lakh</option>
+                <option>₹50 lakh–₹1 crore</option>
+                <option>Above ₹1 crore</option>
+                <option>Not sure yet</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Employment Type</label>
+              <select name="employment">
+                <option value="">Select</option>
+                <option>Salaried</option>
+                <option>Self-employed / Business</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Additional Details</label>
+            <textarea name="details" rows="3" maxlength="1000" placeholder="Tell us more about your requirement (optional)"></textarea>
+          </div>
+
+          <label class="hl-consent">
+            <input type="checkbox" required>
+            <span>I agree to share these details with Microtechnique Buildtech for my home loan enquiry.</span>
+          </label>
+
+          <button class="hl-submit" type="submit">Send Inquiry on WhatsApp <b>↗</b></button>
+          <p class="hl-form-note">WhatsApp will open with your enquiry message. Please review and press Send.</p>
+          <div id="hl-status" role="status"></div>
+        </form>
+      </div>
+    </section>
+
+    <section class="hl-disclaimer">
+      <h3>Important Information</h3>
+      <p>Home loan eligibility, interest rates, fees, loan amount and approval are subject to the lender’s policies, verification and customer profile. Microtechnique Buildtech does not guarantee loan approval or a specific interest rate. EMI shown is an estimate and is not a loan offer.</p>
+    </section>
+  </main>`);
+
+  const form = document.querySelector('#hl-form');
+
+  form.onsubmit = function(e){
+    e.preventDefault();
+
+    const number = BUSINESS_WHATSAPP.replace(/\D/g,'');
+    const status = document.querySelector('#hl-status');
+
+    if(!number || number.includes('XXXXXXXXXX') || number.length < 10){
+      status.textContent = 'Please configure the business WhatsApp number in public/app.js first.';
+      status.className = 'hl-error';
+      return;
+    }
+
+    const d = Object.fromEntries(new FormData(form));
+
+    const message = [
+      '🏠 New Home Loan Inquiry – Microtechnique Buildtech',
+      '',
+      'Customer Name: ' + d.name,
+      'Mobile Number: ' + d.mobile,
+      'City / Location: ' + d.city,
+      'Loan Requirement: ' + d.loan_type,
+      'Approx. Loan Amount: ' + d.loan_amount,
+      'Employment Type: ' + (d.employment || 'Not specified'),
+      '',
+      'Additional Details: ' + (d.details || 'Not provided'),
+      '',
+      'Source: Microtechnique Buildtech Home Loan Form'
+    ].join('\n');
+
+    const url = 'https://wa.me/' + number + '?text=' + encodeURIComponent(message);
+    window.open(url,'_blank','noopener,noreferrer');
+
+    status.textContent = 'WhatsApp opened. Please press Send to submit your enquiry.';
+    status.className = 'hl-success';
+  };
+
+  calcEmi();
+
+  document.querySelectorAll('.hl-reveal').forEach(el=>{
+    if('IntersectionObserver' in window){
+      const observer = new IntersectionObserver(entries=>{
+        entries.forEach(entry=>{
+          if(entry.isIntersecting){
+            entry.target.classList.add('hl-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },{threshold:0.12});
+      observer.observe(el);
+    }else{
+      el.classList.add('hl-visible');
+    }
+  });
+}
+
+window.calcEmi=()=>{
+  const p=Number(document.querySelector('#amt').value);
+  const annual=Number(document.querySelector('#rate').value);
+  const years=Number(document.querySelector('#years').value);
+  const r=annual/1200;
+  const n=years*12;
+  const out=document.querySelector('#emiout');
+
+  if(!(p>0 && annual>0 && years>0 && years<=40)){
+    out.textContent='Please enter valid values';
+    return;
+  }
+
+  const emi=p*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);
+  out.textContent='Monthly EMI: '+money(Math.round(emi));
+};
+function services(){layout(`${pageHero('Property Services','Request assistance for your property journey.','Services')}<main class="container"><div class="grid four">${['Home Interiors','Construction & Renovation','Legal Assistance','Property Valuation','Home Inspection','Property Management','Packers & Movers','Documentation Support'].map(x=>`<div class="category"><strong>${x}</strong><small class="muted">Enquiry available</small></div>`).join('')}</div><div class="formwrap panel"><h2>Request a service</h2><form id="serviceform"><div class="field"><label>Service</label><select name="service">${['Home Interiors','Construction & Renovation','Legal Assistance','Property Valuation','Home Inspection','Property Management','Packers & Movers','Documentation Support'].map(x=>`<option>${x}</option>`).join('')}</select></div><div class="field"><label>Name</label><input name="name" required></div><div class="field"><label>Phone</label><input name="phone" required></div><div class="field"><label>Details</label><textarea name="details"></textarea></div><button>Submit enquiry</button></form></div></main>`);$('#serviceform').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/services',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});toast(d.message);e.target.reset()}catch(x){toast(x.message)}}}
+
+window.savedPropertyIds=window.savedPropertyIds||[];
+
+window.saveFav=async function(id){
+  try{
+    const session=await api('/api/me');
+    me=session.user;
+
+    if(!me){
+      toast('Please login to save favourites');
+      location.href='/login';
+      return;
+    }
+
+    const propertyId=Number(id);
+
+    if(!Number.isInteger(propertyId)||propertyId<=0){
+      toast('Invalid property');
+      return;
+    }
+
+    const buttons=document.querySelectorAll(
+      `[data-favourite-id="${propertyId}"]`
+    );
+
+    buttons.forEach(btn=>{
+      btn.disabled=true;
+      btn.classList.add('favourite-loading');
+    });
+
+    try{
+      const result=await api('/api/favourites/'+propertyId,{
+        method:'POST'
+      });
+
+      const saved=result.saved===true;
+
+      if(saved){
+        if(!window.savedPropertyIds.includes(propertyId)){
+          window.savedPropertyIds.push(propertyId);
+        }
+      }else{
+        window.savedPropertyIds=
+          window.savedPropertyIds.filter(x=>x!==propertyId);
+      }
+
+      buttons.forEach(btn=>{
+        btn.disabled=false;
+        btn.classList.remove('favourite-loading');
+        btn.classList.toggle('is-saved',saved);
+
+        btn.textContent=btn.classList.contains('buy-favourite-btn')
+          ? (saved?'♥':'♡')
+          : (saved?'♥ Saved':'♡ Save');
+      });
+
+      toast(result.message||'Favourite updated');
+
+    }catch(e){
+      buttons.forEach(btn=>{
+        btn.disabled=false;
+        btn.classList.remove('favourite-loading');
+      });
+      toast(e.message);
+    }
+
+  }catch(e){
+    toast('Login session check failed. Please login again.');
+  }
+};
+window.enquire = async id => {
+  const phone = prompt('Your phone number');
+
+  if (!phone) return;
+
+  try {
+    const d = await api('/api/enquiries', {
+      method: 'POST',
+      body: JSON.stringify({
+        property_id: id,
+        phone: phone,
+        message: 'Please contact me about this property.'
+      })
+    });
+
+    if (d && d.ok) {
+      alert('Success! ' + d.message);
+    } else {
+      alert('Enquiry could not be submitted. Please try again.');
+    }
+
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+};
+window.purchaseRequest = async function(propertyId, purpose){
+  if(!me){
+    location.href='/login';
+    return;
+  }
+
+  if(me.role !== 'buyer'){
+    alert('Only registered buyers can submit a purchase request.');
+    return;
+  }
+
+if(!confirm(
+  String(purpose).toLowerCase() === 'rent'
+    ? 'Do you want to send a rental request for this property?'
+    : 'Do you want to send a purchase request for this property?'
+)){    return;
+  }
+
+  try{
+   const result = await api('/api/purchase-requests', {
+  method: 'POST',
+  body: JSON.stringify({
+    property_id: propertyId,
+    request_type: String(purpose).toLowerCase() === 'rent' ? 'rent' : 'buy'
+  })
+    });
+
+    alert(result.message || 'Purchase request submitted successfully.');
+
+  }catch(e){
+    alert(e.message);
+  }
+};
+async function adminProperties(){
+  if(!me || !['admin','super_admin'].includes(me.role)){
+    location.href='/login';
+    return;
+  }
+
+  layout(`${pageHero('Property Approval','Review submitted property listings.','Admin / Properties')}
+    <main class="container">
+      <div class="panel">
+        <h2>Submitted Properties</h2>
+        <button class="secondary" id="refreshProperties">↻ Refresh</button>
+        <div id="adminPropertyList">Loading...</div>
+      </div>
+    </main>`);
+
+  async function loadProperties(){
+    const holder=$('#adminPropertyList');
+    holder.innerHTML='Loading properties...';
+
+    try{
+      const d=await api('/api/admin/properties');
+      const properties=d.properties||[];
+
+      if(!properties.length){
+        holder.innerHTML='<div class="empty">No properties found.</div>';
+        return;
+      }
+
+      holder.innerHTML=properties.map(p=>{
+        const status=['approved','rejected','pending'].includes(p.status)
+          ? p.status : 'pending';
+
+        return `
+          <article class="panel admin-property-card" data-property-id="${esc(String(p.id))}">
+            <div class="admin-property-top">
+              <span class="admin-status-badge status-${status}">
+                ${status==='approved'?'✓ Approved':status==='rejected'?'✕ Rejected':'◷ Pending'}
+              </span>
+            </div>
+
+            ${p.image_url?`<img class="admin-property-cover" src="${esc(p.image_url)}" alt="${esc(p.title)} photo" loading="lazy">`:''}
+            <h3>${esc(p.title)}</h3>
+            <div class="price">${money(p.price)}</div>
+            <div class="admin-photo-tools">
+              <label class="admin-photo-select">＋ Add photos <input type="file" accept="image/jpeg,image/png,image/webp" multiple data-admin-photo-input="${Number(p.id)}" data-photo-count="${Number(p.photo_count||0)}"></label>
+              <button type="button" class="secondary" data-admin-photo-upload="${Number(p.id)}">Upload selected</button>
+              <small>${Number(p.photo_count||0)} / 6 photos saved · auto-compressed</small>
+            </div>
+            <p>Owner / Builder: ${esc(p.lister||'—')}</p>
+            <p>Location: ${esc([p.locality,p.city,p.district,p.state,p.pincode].filter(Boolean).join(', '))}</p>
+            <p>Category: ${esc(p.category||'—')} · Purpose: ${esc(p.purpose||'—')}</p>
+            <p>RERA: ${p.rera_applicable?'Applicable':'Not applicable'} · ${esc(p.rera_number||'Not provided')}</p>
+            <p>${esc(p.description||'No description')}</p>
+
+            <div class="admin-status-actions">
+              <button class="admin-action-btn approve-btn ${status==='approved'?'is-active':''}"
+                data-id="${esc(String(p.id))}" data-status="approved">
+                ${status==='approved'?'✓ Approved':'✓ Approve'}
+              </button>
+
+              <button class="admin-action-btn reject-btn ${status==='rejected'?'is-active':''}"
+                data-id="${esc(String(p.id))}" data-status="rejected">
+                ${status==='rejected'?'✕ Rejected':'✕ Reject'}
+              </button>
+
+              <button class="admin-action-btn pending-btn ${status==='pending'?'is-active':''}"
+                data-id="${esc(String(p.id))}" data-status="pending">
+                ${status==='pending'?'◷ Pending':'◷ Set Pending'}
+              </button>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      holder.querySelectorAll('[data-admin-photo-upload]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const propertyId=Number(btn.dataset.adminPhotoUpload);
+          const input=holder.querySelector(`[data-admin-photo-input="${propertyId}"]`);
+          const files=Array.from(input?.files||[]);
+          if(!files.length)return toast('Select property photos first.');
+          const already=Number(input.dataset.photoCount||0);
+          if(already+files.length>6)return toast('This property can have 6 photos total. It already has '+already+'.');
+          btn.disabled=true;btn.textContent='Uploading…';
+          try{await uploadPropertyImages(propertyId,files);toast('Photos added to property.');await loadProperties();}
+          catch(error){toast(error.message||'Photo upload failed.');}
+          finally{btn.disabled=false;btn.textContent='Upload selected';}
+        };
+      });
+
+      holder.querySelectorAll('button[data-status]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const status=btn.dataset.status;
+          const card=btn.closest('.admin-property-card');
+
+          if(!card || card.dataset.updating==='true')return;
+
+          if(!confirm(`Are you sure you want to mark this property as ${status}?`)){
+            return;
+          }
+
+          const buttons=card.querySelectorAll('button[data-status]');
+          const badge=card.querySelector('.admin-status-badge');
+
+          card.dataset.updating='true';
+          buttons.forEach(b=>{
+            b.disabled=true;
+            b.classList.add('is-loading');
+          });
+
+          btn.classList.add('is-processing');
+          btn.textContent='Updating...';
+
+          try{
+            await api(`/api/admin/properties/${btn.dataset.id}/status`,{
+              method:'POST',
+              body:JSON.stringify({status})
+            });
+
+            const labels={
+              approved:'✓ Approved',
+              rejected:'✕ Rejected',
+              pending:'◷ Pending'
+            };
+
+            badge.className=`admin-status-badge status-${status} status-animate`;
+            badge.textContent=labels[status];
+
+            buttons.forEach(b=>{
+              const s=b.dataset.status;
+              b.classList.remove('is-active','is-processing','is-loading');
+              b.classList.add(s===status?'is-active':'');
+              b.disabled=false;
+              b.textContent=s===status
+                ? labels[s]
+                : s==='approved'?'✓ Approve'
+                : s==='rejected'?'✕ Reject'
+                : '◷ Set Pending';
+            });
+
+            card.classList.remove('card-updated');
+            void card.offsetWidth;
+            card.classList.add('card-updated');
+
+            toast(`Property successfully marked ${status}.`);
+
+          }catch(e){
+            buttons.forEach(b=>{
+              b.disabled=false;
+              b.classList.remove('is-loading','is-processing');
+            });
+
+            toast(e.message||'Unable to update property status.');
+            await loadProperties();
+          }finally{
+            card.dataset.updating='false';
+          }
+        };
+      });
+
+    }catch(e){
+      holder.innerHTML=`<div class="empty">${esc(e.message)}</div>`;
+    }
+  }
+
+  $('#refreshProperties').onclick=loadProperties;
+  await loadProperties();
+}
+
+
+
+async function builderProjectsPage(){
+ if(!me || me.role!=='builder'){location.href='/login';return;}
+ layout(`${pageHero('Builder Project Management','Create projects and manage unit inventory.','Builder')}
+ <main class="container module-page">
+ <div class="grid two">
+ <section class="panel"><h2>Create New Project</h2><form id="builderProjectForm">
+ <div class="field"><label>Project Name</label><input name="title" required></div>
+ <div class="field"><label>Project Type</label><select name="project_type"><option>Residential</option><option>Commercial</option><option>Mixed Use</option></select></div>
+ <div class="field"><label>State</label><input name="state" required></div><div class="field"><label>District</label><input name="district"></div>
+ <div class="field"><label>City</label><input name="city" required></div><div class="field"><label>Locality</label><input name="locality"></div>
+ <div class="field"><label>RERA Number</label><input name="rera_number"></div><div class="field"><label>Description</label><textarea name="description"></textarea></div>
+ <button class="btn">Submit Project for Review</button></form></section>
+ <section class="panel"><h2>Add Inventory to Project</h2><form id="builderInventoryForm">
+ <div class="field"><label>Project ID</label><input name="project_id" type="number" required></div>
+ <div class="field"><label>Unit Type</label><input name="unit_type" placeholder="2 BHK / Shop / Office" required></div>
+ <div class="field"><label>Total Units</label><input name="total_units" type="number"></div>
+ <div class="field"><label>Available Units</label><input name="available_units" type="number"></div>
+ <div class="field"><label>Starting Price (₹)</label><input name="price_from" type="number"></div>
+ <div class="field"><label>Area (sq.ft.)</label><input name="area_from" type="number"></div>
+ <button class="btn">Add Inventory</button></form></section></div>
+ <section class="panel"><h2>My Projects</h2><div id="builderProjectsList">Loading…</div></section></main>`);
+ $('#builderProjectForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/builder/projects',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});toast(d.message+' Project ID: '+d.id);e.target.reset();load()}catch(x){toast(x.message)}};
+ $('#builderInventoryForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));const id=b.project_id;delete b.project_id;try{const d=await api('/api/builder/projects/'+id+'/inventory',{method:'POST',body:JSON.stringify(b)});toast(d.message);e.target.reset()}catch(x){toast(x.message)}};
+ async function load(){try{const d=await api('/api/builder/projects');$('#builderProjectsList').innerHTML=(d.projects||[]).map(p=>`<article class="admin-record-card"><b>#${p.id} · ${esc(p.title)}</b><p>${esc([p.locality,p.city,p.state].filter(Boolean).join(', '))}</p><span class="badge">${esc(p.status)}</span></article>`).join('')||'<p>No projects submitted yet.</p>'}catch(e){$('#builderProjectsList').textContent=e.message}}
+ load();
+}
+async function partnerReferralsPage(){
+ if(!me||me.role!=='channel_partner'){location.href='/login';return;}
+ layout(`${pageHero('Channel Partner Centre','Submit and track your customer referrals.','Channel Partner')}<main class="container module-page"><section class="panel"><h2>Register a Referral</h2><form id="referralForm"><div class="field"><label>Customer Name</label><input name="customer_name" required></div><div class="field"><label>Customer Phone</label><input name="customer_phone" required></div><div class="field"><label>Interest</label><select name="interest"><option>Buy Property</option><option>Rent Property</option><option>Commercial Property</option><option>New Project</option></select></div><div class="field"><label>Notes</label><textarea name="notes"></textarea></div><button class="btn">Submit Referral</button></form></section><section class="panel"><h2>My Referrals</h2><div id="referralList">Loading…</div></section></main>`);
+ $('#referralForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/partner/referrals',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});toast(d.message);e.target.reset();load()}catch(x){toast(x.message)}};
+ async function load(){try{const d=await api('/api/partner/referrals');$('#referralList').innerHTML=(d.referrals||[]).map(r=>`<article class="admin-record-card"><b>${esc(r.customer_name)}</b><p>${esc(r.customer_phone)} · ${esc(r.interest||'')}</p><span class="badge">${esc(r.status)}</span></article>`).join('')||'<p>No referrals submitted yet.</p>'}catch(e){$('#referralList').textContent=e.message}}
+ load();
+}
+async function investorPage(){
+ if(!me||me.role!=='investor'){location.href='/login';return;}
+ layout(`${pageHero('Investor Opportunities','Register your interest in property investment opportunities.','Investor')}<main class="container module-page"><section class="panel"><h2>Submit Investment Enquiry</h2><form id="investorForm"><div class="field"><label>Opportunity / Project</label><input name="opportunity" required></div><div class="field"><label>Investment Budget (₹)</label><input name="budget" type="number" min="0"></div><div class="field"><label>Message</label><textarea name="message"></textarea></div><button class="btn">Submit Enquiry</button></form></section><section class="panel"><h2>My Investment Enquiries</h2><div id="investorList">Loading…</div></section></main>`);
+ $('#investorForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/investor/enquiries',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});toast(d.message);e.target.reset();load()}catch(x){toast(x.message)}};
+ async function load(){try{const d=await api('/api/investor/enquiries');$('#investorList').innerHTML=(d.enquiries||[]).map(r=>`<article class="admin-record-card"><b>${esc(r.opportunity)}</b><p>${money(r.budget||0)} · ${esc(r.message||'')}</p><span class="badge">${esc(r.status)}</span></article>`).join('')||'<p>No enquiries submitted yet.</p>'}catch(e){$('#investorList').textContent=e.message}}
+ load();
+}
+async function adminPartnerLeads(){
+ if(!me||!['admin','super_admin'].includes(me.role)){location.href='/login';return;}
+ layout(`${pageHero('Partner Leads','Review channel partner referrals.','Admin')}<main class="container"><section class="panel"><div id="adminPartnerList">Loading…</div></section></main>`);
+ try{const d=await api('/api/admin/partners');$('#adminPartnerList').innerHTML=(d.referrals||[]).map(r=>`<article class="admin-record-card"><b>${esc(r.customer_name)}</b><p>Partner: ${esc(r.partner_name)} · ${esc(r.customer_phone)}</p><span class="badge">${esc(r.status)}</span></article>`).join('')||'<p>No partner leads.</p>'}catch(e){$('#adminPartnerList').textContent=e.message}
+}
+async function adminInvestors(){
+ if(!me||!['admin','super_admin'].includes(me.role)){location.href='/login';return;}
+ layout(`${pageHero('Investor Enquiries','Review investor interest and budgets.','Admin')}<main class="container"><section class="panel"><div id="adminInvestorList">Loading…</div></section></main>`);
+ try{const d=await api('/api/admin/investors');$('#adminInvestorList').innerHTML=(d.enquiries||[]).map(r=>`<article class="admin-record-card"><b>${esc(r.opportunity)}</b><p>${esc(r.investor_name)} · ${money(r.budget||0)}</p><span class="badge">${esc(r.status)}</span></article>`).join('')||'<p>No investor enquiries.</p>'}catch(e){$('#adminInvestorList').textContent=e.message}
+}
+
+
+async function partnerCommissionsPage(){
+ if(!me||me.role!=='channel_partner'){location.href='/login';return;}
+ layout(`${pageHero('My Commissions','Track commission records shared by the platform administrator.','Channel Partner')}<main class="container"><section class="panel"><div id="commissionList">Loading…</div></section></main>`);
+ try{const d=await api('/api/partner/commissions');$('#commissionList').innerHTML=(d.commissions||[]).map(c=>`<article class="admin-record-card"><b>Commission #${c.id}</b><p>Sale Value: ${money(c.sale_value)} · Rate: ${c.commission_rate}%</p><strong>${money(c.commission_amount)}</strong> <span class="badge">${esc(c.status)}</span></article>`).join('')||'<p>No commission records yet.</p>'}catch(e){$('#commissionList').textContent=e.message}
+}
+async function adminCommissionsPage(){
+ if(!me||!['admin','super_admin'].includes(me.role)){location.href='/login';return;}
+ layout(`${pageHero('Partner Commissions','Record and manage channel partner commissions.','Admin')}<main class="container"><section class="panel"><h2>Create Commission</h2><form id="commissionForm"><div class="field"><label>Referral ID</label><input name="referral_id" type="number" required></div><div class="field"><label>Sale Value (₹)</label><input name="sale_value" type="number" min="1" required></div><div class="field"><label>Commission Rate (%)</label><input name="commission_rate" type="number" min="0.1" max="100" step=".1" required></div><button class="btn">Record Commission</button></form></section><section class="panel"><h2>Commission Ledger</h2><div id="adminCommissionList">Loading…</div></section></main>`);
+ $('#commissionForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/admin/partner-commissions',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});toast(d.message);e.target.reset();load()}catch(x){toast(x.message)}};
+ async function load(){try{const d=await api('/api/admin/partner-commissions');$('#adminCommissionList').innerHTML=(d.commissions||[]).map(c=>`<article class="admin-record-card"><b>${esc(c.customer_name)} · ${esc(c.partner_name)}</b><p>${money(c.sale_value)} × ${c.commission_rate}% = <strong>${money(c.commission_amount)}</strong></p><select data-commission-status="${c.id}"><option ${c.status==='pending'?'selected':''}>pending</option><option ${c.status==='approved'?'selected':''}>approved</option><option ${c.status==='paid'?'selected':''}>paid</option><option ${c.status==='rejected'?'selected':''}>rejected</option></select></article>`).join('')||'<p>No commissions recorded.</p>';document.querySelectorAll('[data-commission-status]').forEach(el=>el.onchange=async()=>{try{await api('/api/admin/partner-commissions/'+el.dataset.commissionStatus+'/status',{method:'PATCH',body:JSON.stringify({status:el.value})});toast('Commission status updated')}catch(e){toast(e.message)}})}catch(e){$('#adminCommissionList').textContent=e.message}}
+ load();
+}
+async function adminFeaturedOffers(){
+ if(!me||!['admin','super_admin'].includes(me.role)){location.href='/login';return;}
+ layout(`${pageHero('Featured Property Offers','Choose an approved property and publish a homepage offer.','Admin')}<main class="container"><section class="panel"><form id="offerForm"><div class="field"><label>Approved Property ID</label><input name="property_id" type="number" required></div><div class="field"><label>Offer Label</label><input name="discount_label" placeholder="Special price / Limited offer"></div><div class="field"><label>Offer Price (₹)</label><input name="offer_price" type="number" min="1" required></div><div class="field"><label>Start Date</label><input name="starts_at" type="date"></div><div class="field"><label>End Date</label><input name="ends_at" type="date"></div><button class="btn">Publish Offer</button></form></section><section class="panel"><h2>Active Offers</h2><div id="offerList">Loading…</div></section></main>`);
+ $('#offerForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/api/admin/featured-offers',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});toast(d.message);e.target.reset();load()}catch(x){toast(x.message)}};
+ async function load(){try{const d=await api('/api/featured-offers');$('#offerList').innerHTML=(d.offers||[]).map(o=>`<article class="admin-record-card"><b>${esc(o.title)}</b><p>${esc(o.city)} · ${esc(o.discount_label||'Offer')} · ${money(o.offer_price||0)}</p></article>`).join('')||'<p>No active offers.</p>'}catch(e){$('#offerList').textContent=e.message}}
+ load();
+}
+
+async function boot(){try{me=(await api('/api/me')).user}catch{}const p=location.pathname;if (p === '/platform') {
+  window.location.replace('/admin/dashboard');
+  return;
+}if(p==='/')return home();if(p==='/platform')return dashboard(true);if(configs[p])return searchPage(p);if(p==='/property/'+p.split('/')[2]&&p.split('/')[2])return detail(p.split('/')[2]);if(p==='/login')return authPage(false);if(p==='/register')return authPage(true);
+if(p==='/builder/projects')return builderProjectsPage();
+
+
+
+if (
+  p === '/dashboard' &&
+  me &&
+  ['admin', 'super_admin'].includes(me.role)
+) {
+  window.location.replace('/admin/dashboard');
+  return;
+}
+
+if (
+  p === '/dashboard' ||
+  p.startsWith('/dashboard/') ||
+  p.startsWith('/owner/')
+) {
+  return dashboard(false);
+}
+
+if(p==='/builder/projects')return builderProjectsPage();
+if(p==='/partner/commissions')return partnerCommissionsPage();
+if(p==='/admin/partner-commissions')return adminCommissionsPage();
+if(p==='/admin/featured-offers')return adminFeaturedOffers();
+if(p==='/partner/referrals')return partnerReferralsPage();
+if(p==='/investor/opportunities')return investorPage();
+if(p==='/admin/partners')return adminPartnerLeads();
+if(p==='/admin/investors')return adminInvestors();
+if(p==='/admin/properties')return adminProperties();if(p==='/admin/dashboard'||p.startsWith('/admin/'))return dashboard(true);if(p==='/post-property')return postProperty();if(p==='/home-loans'||p==='/emi-calculator')return loans();if(p==='/services')return services();if(p==='/about'||p==='/contact'){layout(`${pageHero(p==='/about'?'About Microtechnique Buildtech':'Contact Us',p==='/about'?'Smart real estate solutions for property discovery across India.':'Connect with the Microtechnique Buildtech team.',p.slice(1))}<main class="container"><div class="panel"><h2>${p==='/about'?'Our platform':'Send an enquiry'}</h2><p class="muted">Microtechnique Buildtech is designed to connect property seekers and property providers across India. Contact and support workflows can be configured for launch.</p><a class="btn" href="/register">Get started</a></div></main>`);return}layout(`${pageHero('Page not found','The requested page does not exist.')}<main class="container"><a class="btn" href="/">Return home</a></main>`)}boot();
+
+async function restoreOwnerProperty(id) {
+  if (!confirm('Restore this property?')) return;
+
+  try {
+    await api(`/api/owner/properties/${id}/restore`, {
+      method: 'PATCH'
+    });
+
+    alert('Property restored. Pending approval.');
+    location.reload();
+
+  } catch (error) {
+    alert(error.message || 'Unable to restore property.');
+  }
+}
+// GLOBAL LOGOUT FUNCTION
+window.logout = async function () {
+  try {
+    const response = await fetch('/api/logout', {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
+
+    if (!response.ok) {
+      throw new Error('Logout failed. Please try again.');
+    }
+
+    me = null;
+    window.location.replace('/');
+
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+
+// GLOBAL SITE VISIT FUNCTION
+window.visit = async function (id) {
+  const date = prompt('Preferred visit date (YYYY-MM-DD)');
+
+  if (!date) return;
+
+  try {
+    const response = await api('/api/visits', {
+      method: 'POST',
+      body: JSON.stringify({
+        property_id: id,
+        visit_date: date
+      })
+    });
+
+    alert(response.message || 'Visit request submitted successfully');
+
+  } catch (error) {
+    alert(error.message);
+  }
+};

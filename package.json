@@ -1,0 +1,33 @@
+{
+  "name": "microtechnique-buildtech",
+  "version": "1.0.0",
+  "private": true,
+  "description": "India-wide real estate marketplace starter for Microtechnique Buildtech",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^13.0.3",
+    "connect-sqlite3": "^0.9.16",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "express-session": "^1.18.1",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "sqlite3": "^6.0.1"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "sqlite3@5.1.7": true
+  },
+  "devDependencies": {
+    "node-gyp": "^13.1.0"
+  }
+}
